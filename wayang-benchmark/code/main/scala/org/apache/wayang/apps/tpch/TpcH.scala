@@ -64,7 +64,7 @@ object TpcH {
       } else if (jdbcPlatform.equals(Sqlite3.platform)) {
         (table: String, columns: Seq[String]) => new Sqlite3TableSource(table, columns: _*)
       } else if (jdbcPlatform.equals(Postgres.platform)) {
-        (table: String, columns: Seq[String]) => new PostgresTableSource(table, columns: _*)
+        (table: String, columns: Seq[String]) => new PostgresTableSource(table, columns: _*).getOutput
       } else {
         throw new IllegalArgumentException(s"Unsupported database: $jdbcPlatform.")
       }
