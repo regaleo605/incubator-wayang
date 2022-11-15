@@ -71,4 +71,8 @@ public class TraceTag extends HackitTag  {
     public int hashCode() {
         return 7;
     }
+    @Override
+    public String toString(){
+        return "TraceTag";
+    }
 }

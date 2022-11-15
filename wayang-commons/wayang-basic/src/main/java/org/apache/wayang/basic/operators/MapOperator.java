@@ -29,8 +29,13 @@ import org.apache.wayang.core.optimizer.cardinality.CardinalityEstimator;
 import org.apache.wayang.core.optimizer.cardinality.DefaultCardinalityEstimator;
 import org.apache.wayang.core.plan.wayangplan.UnaryToUnaryOperator;
 import org.apache.wayang.core.types.DataSetType;
+import org.apache.wayang.plugin.hackit.core.Hackit;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
+import org.apache.wayang.plugin.hackit.core.tags.LogTag;
+import org.apache.wayang.plugin.hackit.core.tags.PauseTag;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 
-import java.util.Optional;
+import java.util.*;
 
 /**
  * A map operator represents semantics as they are known from frameworks, such as Spark and Flink. It pulls each
@@ -43,6 +48,16 @@ public class MapOperator<InputType, OutputType> extends UnaryToUnaryOperator<Inp
      */
     protected final TransformationDescriptor<InputType, OutputType> functionDescriptor;
 
+    protected TransformationDescriptor<InputType,InputType> pre;
+
+    protected TransformationDescriptor<OutputType,OutputType> post;
+
+    protected boolean isHackIt = false;
+    public TransformationDescriptor<InputType, InputType> getPre(){return this.pre;}
+    public TransformationDescriptor<OutputType,OutputType> getPost(){return this.post;}
+
+    public boolean isHackit(){return this.isHackIt;}
+
     /**
      * Creates a new instance.
      */
@@ -51,6 +66,18 @@ public class MapOperator<InputType, OutputType> extends UnaryToUnaryOperator<Inp
                        Class<OutputType> outputTypeClass) {
         this(new TransformationDescriptor<>(function, inputTypeClass, outputTypeClass));
     }
+
+
+    public MapOperator(FunctionDescriptor.SerializableFunction<InputType, OutputType> function,
+                       Class<InputType> inputTypeClass,
+                       Class<OutputType> outputTypeClass
+            ,FunctionDescriptor.SerializableFunction<InputType,InputType> pre
+            ,FunctionDescriptor.SerializableFunction<OutputType,OutputType> post) {
+        this(new TransformationDescriptor<>(function, inputTypeClass, outputTypeClass)
+                ,new TransformationDescriptor<>(pre,inputTypeClass,inputTypeClass)
+                ,new TransformationDescriptor<>(post,outputTypeClass,outputTypeClass));
+    }
+
 
     /**
      * Creates a new instance.
@@ -61,6 +88,17 @@ public class MapOperator<InputType, OutputType> extends UnaryToUnaryOperator<Inp
                 DataSetType.createDefault(functionDescriptor.getOutputType()));
     }
 
+
+    //Hack it version TransformationDescriptor Set
+    public MapOperator(TransformationDescriptor<InputType, OutputType> functionDescriptor
+            ,TransformationDescriptor<InputType,InputType> pre
+            ,TransformationDescriptor<OutputType,OutputType> post) {
+        this(functionDescriptor,
+                DataSetType.createDefault(functionDescriptor.getInputType()),
+                DataSetType.createDefault(functionDescriptor.getOutputType()),pre,post);
+    }
+
+
     /**
      * Creates a new instance.
      */
@@ -68,6 +106,19 @@ public class MapOperator<InputType, OutputType> extends UnaryToUnaryOperator<Inp
         super(inputType, outputType, true);
         this.functionDescriptor = functionDescriptor;
     }
+
+    //HackIt version super Operator Set
+    public MapOperator(TransformationDescriptor<InputType, OutputType> functionDescriptor, DataSetType<InputType> inputType, DataSetType<OutputType> outputType
+            ,TransformationDescriptor<InputType,InputType> pre
+            ,TransformationDescriptor<OutputType, OutputType> post) {
+        super(inputType, outputType, true);
+        this.functionDescriptor = functionDescriptor;
+        this.isHackIt = true;
+        this.pre = pre;
+        this.post = post;
+    }
+
+
 
     /**
      * Copies an instance (exclusive of broadcasts).
@@ -77,6 +128,9 @@ public class MapOperator<InputType, OutputType> extends UnaryToUnaryOperator<Inp
     public MapOperator(MapOperator<InputType, OutputType> that) {
         super(that);
         this.functionDescriptor = that.getFunctionDescriptor();
+        this.isHackIt = that.isHackit();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     /**

@@ -71,4 +71,8 @@ public class DisplayTag extends HackitTag  {
     public int hashCode() {
         return 3;
     }
+    @Override
+    public String toString(){
+        return "DisplayTag";
+    }
 }

@@ -629,6 +629,22 @@ abstract class DataQuanta[Out: ClassTag](val operator: ElementaryOperator, var o
     collector
   }
 
+  def collectJava(): JavaCollection[Out] = {
+    // Set up the sink.
+    val collector = new java.util.LinkedList[Out]()
+    val sink = LocalCallbackSink.createCollectingSink(collector, dataSetType[Out])
+    sink.setName("collect()")
+    this.connectTo(sink, 0)
+
+    // Do the execution.
+    this.planBuilder.sinks += sink
+    this.planBuilder.buildAndExecute()
+    this.planBuilder.sinks.clear()
+
+    // Return the collected values.
+    collector
+  }
+
   /**
     * Write the data quanta in this instance to a text file. Triggers execution.
     *

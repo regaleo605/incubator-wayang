@@ -18,6 +18,7 @@
 
 package org.apache.wayang.java.operators;
 
+import io.netty.handler.codec.serialization.ObjectEncoder;
 import org.apache.wayang.basic.operators.TextFileSource;
 import org.apache.wayang.core.api.exception.WayangException;
 import org.apache.wayang.core.optimizer.OptimizationContext;
@@ -30,6 +31,8 @@ import org.apache.wayang.core.util.fs.FileSystem;
 import org.apache.wayang.core.util.fs.FileSystems;
 import org.apache.wayang.java.channels.StreamChannel;
 import org.apache.wayang.java.execution.JavaExecutor;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -50,6 +53,8 @@ public class JavaTextFileSource extends TextFileSource implements JavaExecutionO
         super(inputUrl);
     }
 
+    private boolean isHackit = false;
+
     /**
      * Copies an instance (exclusive of broadcasts).
      *
@@ -57,6 +62,7 @@ public class JavaTextFileSource extends TextFileSource implements JavaExecutionO
      */
     public JavaTextFileSource(TextFileSource that) {
         super(that);
+        this.isHackit = that.isHackit();
     }
 
     @Override
@@ -68,6 +74,7 @@ public class JavaTextFileSource extends TextFileSource implements JavaExecutionO
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
 
+
         String url = this.getInputUrl().trim();
         FileSystem fs = FileSystems.getFileSystem(url).orElseThrow(
                 () -> new WayangException(String.format("Cannot access file system of %s.", url))
@@ -76,7 +83,14 @@ public class JavaTextFileSource extends TextFileSource implements JavaExecutionO
         try {
             final InputStream inputStream = fs.open(url);
             Stream<String> lines = new BufferedReader(new InputStreamReader(inputStream)).lines();
-            ((StreamChannel.Instance) outputs[0]).accept(lines);
+
+            if(isHackit){
+                Stream<HackitTuple<Object,String>> result = lines.map(x -> new HackitTuple(x));
+                ((StreamChannel.Instance) outputs[0]).accept(result);
+            } else {
+                ((StreamChannel.Instance) outputs[0]).accept(lines);
+            }
+
         } catch (IOException e) {
             throw new WayangException(String.format("Reading %s failed.", url), e);
         }

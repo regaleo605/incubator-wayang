@@ -18,6 +18,7 @@
 
 package org.apache.wayang.java.operators;
 
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 import org.junit.Assert;
 import org.junit.Test;
 import org.apache.wayang.basic.data.Tuple2;
@@ -86,6 +87,7 @@ public class JavaJoinOperatorTest extends JavaExecutionOperatorTestBase {
             }
             return cmp;
         });
+
         final List<Tuple2<Tuple2<Integer, String>, Tuple2<String, Integer>>> expectedResult = Arrays.asList(
                 new Tuple2<>(new Tuple2<>(1, "b"), new Tuple2<>("x", 1)),
                 new Tuple2<>(new Tuple2<>(1, "b"), new Tuple2<>("y", 1)),
@@ -96,7 +98,5 @@ public class JavaJoinOperatorTest extends JavaExecutionOperatorTestBase {
 
         Assert.assertEquals(expectedResult, result);
 
-
     }
-
 }

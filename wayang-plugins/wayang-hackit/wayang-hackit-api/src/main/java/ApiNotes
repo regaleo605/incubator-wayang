@@ -1,0 +1,62 @@
+
+ WayangContext wayang = new WayangContext().with(Java.basicPlugin());
+        List<Integer> data = Arrays.asList(1,2,3,4,5,6,7,8,9);
+        List<HackitTuple> data2 = Arrays.asList(new HackitTuple(1),new HackitTuple(2),new HackitTuple(3));
+        System.out.println(data);
+
+        HackItDataQuanta<HackitTuple> hackIt = new HackItDataQuanta(wayang);
+
+        HackItTag tag = new HackItTag("Crash");
+        HackitTag tags = new PauseTag();
+        Collection<Integer> results =hackIt.loadCollection(data2,HackitTuple.class)
+                .mapNormal(x -> (int) x.getValue(),null,HackitTuple.class,Integer.class)
+                .mapNormal(x->x*2,null,Integer.class,Integer.class)
+                .collect(Integer.class);
+
+data1 integer, data2 hackittuple
+hackit 1 hackittuple, hackit2 integer, hackit3 string
+
+
+
+//Example with HackIt
+        //when instantiating Hackitwrapper need to specify the original class
+        HackItDataQuanta<Integer> hackit2 = new HackItDataQuanta<>(wayang);
+
+        //working with Tag probably will be error if mixing with normal tuple
+        //Collection data3 =hackit2.loadCollection(data2,HackitTuple.class)
+          //              .mapHackit(x -> x.doubleValue(),null,tag)
+            //                    .collect(HackitTuple.class);
+
+        //System.out.println(data3);
+
+        //For Testing purposes
+
+        /*
+        Collection reduce = hackit2.loadCollection(data,Integer.class)
+                .mapNormal(x -> new Tuple2<Integer,Integer>(x%2,x),null,Integer.class, Tuple2.class)
+                .reduceByNormal(x -> x.getField0(),(a,b) -> new Tuple2<>(a.getField0(), a.getField1()+b.getField1()), Integer.class, Tuple2.class)
+                .collect(Tuple2.class);
+
+         */
+           Collection reduce = hackit2.loadCollection(data2,HackitTuple.class)
+                                 .mapHackit(x -> new Tuple2<Integer, Integer>(x % 2,x) ,null,tag)
+                         .reduceByHackit(x->x.getField0(),(a,b) -> new Tuple2<>(a.getField0(),a.getField1()+b.getField1()),Integer.class,HackitTuple.class,tags,tags)
+                                         .collect(HackitTuple.class);
+                 System.out.println(reduce);
+
+
+
+                 /*
+                 HackItDataQuanta<String> hackit3 = new HackItDataQuanta<>(wayang);
+                 Collection flat = hackit3.
+                         loadTextFile(FILE_SOME_LINES_TXT.toString(),true)
+                         .flatMapHackit(line -> Arrays.asList(line.split(" ")),
+                         String.class,
+                         String.class,tags,tags)
+                         //.mapNormal(word -> new Tuple2(word.toLowerCase(),1),null,String.class,Tuple2.class)
+                                 .collect(String.class);
+
+
+                 System.out.println(flat);
+
+                  */

@@ -34,12 +34,10 @@ import org.apache.wayang.java.channels.CollectionChannel;
 import org.apache.wayang.java.channels.JavaChannelInstance;
 import org.apache.wayang.java.channels.StreamChannel;
 import org.apache.wayang.java.execution.JavaExecutor;
+import org.apache.wayang.java.plugin.hackit.HackitStream;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.BinaryOperator;
 
 /**
@@ -48,6 +46,14 @@ import java.util.function.BinaryOperator;
 public class JavaGlobalReduceOperator<Type>
         extends GlobalReduceOperator<Type>
         implements JavaExecutionOperator {
+
+    private HackitTag preTag;
+    private HackitTag postTag;
+    private boolean isHackIt = false;
+
+    private Set<HackitTag> preTags;
+
+    private Set<HackitTag> postTags;
 
 
     /**
@@ -68,6 +74,12 @@ public class JavaGlobalReduceOperator<Type>
      */
     public JavaGlobalReduceOperator(GlobalReduceOperator<Type> that) {
         super(that);
+        this.isHackIt = that.isHackIt();
+        this.preTag =that.getPreTag();
+        this.postTag= that.getPostTag();
+
+        this.preTags = that.getPreTags();
+        this.postTags = that.getPostTags();
     }
 
     @Override
@@ -79,10 +91,31 @@ public class JavaGlobalReduceOperator<Type>
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
 
+        if(isHackIt) return hackit(inputs,outputs,javaExecutor,operatorContext);
+
         final BinaryOperator<Type> reduceFunction = javaExecutor.getCompiler().compile(this.reduceDescriptor);
         JavaExecutor.openFunction(this, reduceFunction, inputs, operatorContext);
 
         final Optional<Type> reduction = ((JavaChannelInstance) inputs[0]).<Type>provideStream().reduce(reduceFunction);
+        ((CollectionChannel.Instance) outputs[0]).accept(reduction.isPresent() ?
+                Collections.singleton(reduction.get()) :
+                Collections.emptyList());
+
+        return ExecutionOperator.modelEagerExecution(inputs, outputs, operatorContext);
+    }
+
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            JavaExecutor javaExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+
+        final BinaryOperator<Type> reduceFunction = javaExecutor.getCompiler().compile(this.reduceDescriptor);
+        JavaExecutor.openFunction(this, reduceFunction, inputs, operatorContext);
+
+        //final Optional<Type> reduction = ((JavaChannelInstance) inputs[0]).<Type>provideStream().reduce(reduceFunction);
+        final Optional<Type> reduction = (Optional<Type>) new HackitStream<>(((JavaChannelInstance) inputs[0]).provideStream())
+                .reduce(reduceFunction,this.preTags,this.postTags);
         ((CollectionChannel.Instance) outputs[0]).accept(reduction.isPresent() ?
                 Collections.singleton(reduction.get()) :
                 Collections.emptyList());

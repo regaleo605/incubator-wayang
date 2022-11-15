@@ -30,6 +30,7 @@ import org.apache.wayang.java.channels.CollectionChannel;
 import org.apache.wayang.java.channels.JavaChannelInstance;
 import org.apache.wayang.java.channels.StreamChannel;
 import org.apache.wayang.java.execution.JavaExecutor;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 
 import java.io.Serializable;
 import java.util.Arrays;
@@ -41,6 +42,8 @@ import java.util.function.Consumer;
  * Implementation of the {@link LocalCallbackSink} operator for the Java platform.
  */
 public class JavaLocalCallbackSink<T extends Serializable> extends LocalCallbackSink<T> implements JavaExecutionOperator {
+
+    private boolean value = false;
     /**
      * Creates a new instance.
      *
@@ -58,6 +61,7 @@ public class JavaLocalCallbackSink<T extends Serializable> extends LocalCallback
      */
     public JavaLocalCallbackSink(LocalCallbackSink<T> that) {
         super(that);
+        this.value = that.isValue();
     }
 
     @Override
@@ -69,7 +73,12 @@ public class JavaLocalCallbackSink<T extends Serializable> extends LocalCallback
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
 
-        ((JavaChannelInstance) inputs[0]).<T>provideStream().forEach(this.callback);
+        if(isValue()) {
+            ((JavaChannelInstance) inputs[0]).<HackitTuple<Object,T>>provideStream().map(x ->x.getValue()).forEach(this.callback);
+        } else {
+            ((JavaChannelInstance) inputs[0]).<T>provideStream().forEach(this.callback);
+
+        }
 
         return ExecutionOperator.modelEagerExecution(inputs, outputs, operatorContext);
     }

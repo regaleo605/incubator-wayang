@@ -32,15 +32,14 @@ import org.apache.wayang.core.platform.ChannelInstance;
 import org.apache.wayang.core.platform.lineage.ExecutionLineageNode;
 import org.apache.wayang.core.types.DataSetType;
 import org.apache.wayang.core.util.Tuple;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 import org.apache.wayang.spark.channels.BroadcastChannel;
 import org.apache.wayang.spark.channels.RddChannel;
 import org.apache.wayang.spark.execution.SparkExecutor;
+import org.apache.wayang.spark.plugin.hackit.HackitRDD;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 
 /**
@@ -49,6 +48,10 @@ import java.util.Optional;
 public class SparkMapOperator<InputType, OutputType>
         extends MapOperator<InputType, OutputType>
         implements SparkExecutionOperator {
+    private TransformationDescriptor<InputType, InputType> pre;
+
+    private TransformationDescriptor<OutputType,OutputType> post;
+    private boolean isHackIt = false;
 
     /**
      * Creates a new instance.
@@ -67,6 +70,9 @@ public class SparkMapOperator<InputType, OutputType>
      */
     public SparkMapOperator(MapOperator<InputType, OutputType> that) {
         super(that);
+        this.isHackIt = that.isHackit();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     @Override
@@ -78,6 +84,8 @@ public class SparkMapOperator<InputType, OutputType>
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
 
+        if(this.isHackIt) return hackit(inputs,outputs,sparkExecutor,operatorContext);
+
         RddChannel.Instance input = (RddChannel.Instance) inputs[0];
         RddChannel.Instance output = (RddChannel.Instance) outputs[0];
 
@@ -85,6 +93,32 @@ public class SparkMapOperator<InputType, OutputType>
         final Function<InputType, OutputType> mapFunctions =
                 sparkExecutor.getCompiler().compile(this.functionDescriptor, this, operatorContext, inputs);
         final JavaRDD<OutputType> outputRdd = inputRdd.map(mapFunctions);
+        this.name(outputRdd);
+
+        output.accept(outputRdd, sparkExecutor);
+
+        return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
+    }
+
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            SparkExecutor sparkExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+        RddChannel.Instance input = (RddChannel.Instance) inputs[0];
+        RddChannel.Instance output = (RddChannel.Instance) outputs[0];
+
+        final Function<InputType, OutputType> mapFunctions =
+                sparkExecutor.getCompiler().compile(this.functionDescriptor, this, operatorContext, inputs);
+        Function<InputType,InputType> preFunction = null;
+        Function<OutputType,OutputType> postFunction = null;
+        if(this.pre.getJavaImplementation()!=null) preFunction = sparkExecutor.getCompiler().compile(this.pre,this,operatorContext,inputs);
+        if(this.post.getJavaImplementation() !=null){
+            postFunction = sparkExecutor.getCompiler().compile(this.post,this,operatorContext,inputs);
+        }
+
+
+        final JavaRDD<OutputType> outputRdd = new HackitRDD<>(input.provideHackitRDD()).map(mapFunctions,preFunction,postFunction).getRdd();
         this.name(outputRdd);
 
         output.accept(outputRdd, sparkExecutor);

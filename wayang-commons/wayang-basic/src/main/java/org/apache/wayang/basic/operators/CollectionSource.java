@@ -37,13 +37,27 @@ public class CollectionSource<T> extends UnarySource<T> implements ElementaryOpe
 
     protected final Collection<T> collection;
 
+    protected boolean isHackit;
+
+    public boolean isHackit(){return this.isHackit;}
+
     public CollectionSource(Collection<T> collection, Class<T> typeClass) {
         this(collection, DataSetType.createDefault(typeClass));
+    }
+
+    public CollectionSource(Collection<T> collection, Class<T> typeClass,boolean value) {
+        this(collection, DataSetType.createDefault(typeClass),value);
     }
 
     public CollectionSource(Collection<T> collection, DataSetType<T> type) {
         super(type);
         this.collection = collection;
+    }
+
+    public CollectionSource(Collection<T> collection, DataSetType<T> type,boolean value) {
+        super(type);
+        this.collection = collection;
+        this.isHackit = value;
     }
 
     /**
@@ -54,6 +68,7 @@ public class CollectionSource<T> extends UnarySource<T> implements ElementaryOpe
     public CollectionSource(CollectionSource that) {
         super(that);
         this.collection = that.getCollection();
+        this.isHackit = that.isHackit();
     }
 
     public Collection<T> getCollection() {

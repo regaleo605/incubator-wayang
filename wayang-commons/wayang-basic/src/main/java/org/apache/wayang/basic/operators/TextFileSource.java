@@ -24,12 +24,14 @@ import org.apache.wayang.core.api.Configuration;
 import org.apache.wayang.core.optimizer.OptimizationContext;
 import org.apache.wayang.core.optimizer.cardinality.CardinalityEstimate;
 import org.apache.wayang.core.plan.wayangplan.UnarySource;
+import org.apache.wayang.core.types.BasicDataUnitType;
 import org.apache.wayang.core.types.DataSetType;
 import org.apache.wayang.core.util.LimitedInputStream;
 import org.apache.wayang.core.util.fs.FileSystem;
 import org.apache.wayang.core.util.fs.FileSystems;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -49,14 +51,28 @@ public class TextFileSource extends UnarySource<String> {
 
     private final String encoding;
 
+    protected boolean isHackit = false;
+
+    public boolean isHackit() { return isHackit;}
+
     public TextFileSource(String inputUrl) {
         this(inputUrl, "UTF-8");
+    }
+
+    public TextFileSource(String inputUrl,boolean flag) {
+        this(inputUrl, "UTF-8",flag);
     }
 
     public TextFileSource(String inputUrl, String encoding) {
         super(DataSetType.createDefault(String.class));
         this.inputUrl = inputUrl;
         this.encoding = encoding;
+    }
+    public TextFileSource(String inputUrl, String encoding,boolean flag) {
+        super(DataSetType.createDefault(String.class));
+        this.inputUrl = inputUrl;
+        this.encoding = encoding;
+        this.isHackit = flag;
     }
 
     /**

@@ -35,15 +35,15 @@ import org.apache.wayang.core.platform.ChannelInstance;
 import org.apache.wayang.core.platform.lineage.ExecutionLineageNode;
 import org.apache.wayang.core.types.DataSetType;
 import org.apache.wayang.core.util.Tuple;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 import org.apache.wayang.spark.channels.RddChannel;
 import org.apache.wayang.spark.compiler.FunctionCompiler;
 import org.apache.wayang.spark.execution.SparkExecutor;
+import org.apache.wayang.spark.plugin.hackit.HackitPairRDD;
+import org.apache.wayang.spark.plugin.hackit.HackitRDD;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Spark implementation of the {@link JoinOperator}.
@@ -51,6 +51,13 @@ import java.util.Optional;
 public class SparkJoinOperator<InputType0, InputType1, KeyType>
         extends JoinOperator<InputType0, InputType1, KeyType>
         implements SparkExecutionOperator {
+
+    private HackitTag preTag;
+    private HackitTag postTag;
+    private boolean isHackIt = false;
+
+    private Set<HackitTag> preTags;
+    private Set<HackitTag> postTags;
 
     /**
      * Creates a new instance.
@@ -70,6 +77,12 @@ public class SparkJoinOperator<InputType0, InputType1, KeyType>
      */
     public SparkJoinOperator(JoinOperator<InputType0, InputType1, KeyType> that) {
         super(that);
+        this.preTag =that.getPreTag();
+        this.postTag = that.getPostTag();
+        this.isHackIt = that.isHackIt();
+
+        this.preTags = that.getPreTags();
+        this.postTags = that.getPostTags();
     }
 
     @Override
@@ -80,6 +93,8 @@ public class SparkJoinOperator<InputType0, InputType1, KeyType>
             OptimizationContext.OperatorContext operatorContext) {
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
+
+        if(isHackIt) return hackit(inputs,outputs,sparkExecutor,operatorContext);
 
         final RddChannel.Instance input0 = (RddChannel.Instance) inputs[0];
         final RddChannel.Instance input1 = (RddChannel.Instance) inputs[1];
@@ -108,6 +123,39 @@ public class SparkJoinOperator<InputType0, InputType1, KeyType>
         return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
     }
 
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            SparkExecutor sparkExecutor,
+            OptimizationContext.OperatorContext operatorContext){
+
+        final RddChannel.Instance input0 = (RddChannel.Instance) inputs[0];
+        final RddChannel.Instance input1 = (RddChannel.Instance) inputs[1];
+        final RddChannel.Instance output = (RddChannel.Instance) outputs[0];
+
+        final JavaRDD<HackitTuple<Object,InputType0>> inputRdd0 = input0.provideHackitRDD();
+        final JavaRDD<HackitTuple<Object,InputType1>> inputRdd1 = input1.provideHackitRDD();
+
+        FunctionCompiler compiler = sparkExecutor.getCompiler();
+        final PairFunction<InputType0, KeyType, InputType0> keyExtractor0 = compiler.compileToKeyExtractor(this.keyDescriptor0);
+        final PairFunction<InputType1, KeyType, InputType1> keyExtractor1 = compiler.compileToKeyExtractor(this.keyDescriptor1);
+        JavaPairRDD<KeyType, HackitTuple<Object,InputType0>> pairStream0 = new HackitRDD<>(inputRdd0).mapToPair(keyExtractor0,this.preTags).getPairRDD();
+        JavaPairRDD<KeyType, HackitTuple<Object,InputType1>> pairStream1 = new HackitRDD<>(inputRdd1).mapToPair(keyExtractor1).getPairRDD();
+
+        final JavaPairRDD<KeyType, HackitTuple<Object,scala.Tuple2<InputType0, InputType1>>> outputPair = new HackitPairRDD<>(pairStream0)
+                .join(new HackitPairRDD<>(pairStream1),this.preTags,this.postTags);
+        this.name(outputPair);
+
+        // convert from scala tuple to wayang tuple
+        final JavaRDD<HackitTuple<Object,Tuple2<InputType0, InputType1>>> outputRdd = outputPair
+                .map(x -> x._2).map(new HackitTupleConverter<>());
+        this.name(outputRdd);
+
+        output.accept(outputRdd, sparkExecutor);
+
+        return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
+    }
+
     @Override
     protected ExecutionOperator createCopy() {
         return new SparkJoinOperator<>(this.getInputType0(), this.getInputType1(),
@@ -124,6 +172,16 @@ public class SparkJoinOperator<InputType0, InputType1, KeyType>
         @Override
         public Tuple2<InputType0, InputType1> call(scala.Tuple2<KeyType, scala.Tuple2<InputType0, InputType1>> scalaTuple) throws Exception {
             return new Tuple2<>(scalaTuple._2._1, scalaTuple._2._2);
+        }
+    }
+
+    private static class HackitTupleConverter<InputType0,InputType1, KeyType>
+            implements Function<HackitTuple<Object,scala.Tuple2<InputType0,InputType1>>,HackitTuple<Object,Tuple2<InputType0,InputType1>>>
+    {
+
+        @Override
+        public HackitTuple<Object, Tuple2<InputType0, InputType1>> call(HackitTuple<Object, scala.Tuple2<InputType0, InputType1>> hackitScalaTuple) throws Exception {
+            return new HackitTuple<>(hackitScalaTuple.getHeader(),new Tuple2<>(hackitScalaTuple.getValue()._1,hackitScalaTuple.getValue()._2));
         }
     }
 

@@ -24,6 +24,7 @@ import org.apache.wayang.plugin.hackit.core.tuple.header.HeaderBuilder;
 
 import java.io.Serializable;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -181,4 +182,31 @@ public class HackitTuple<K, T> implements Serializable, ActionGroup {
     public boolean isSkip() {
         return this.getHeader().isSkip();
     }
+
+    public void setValue(T value){
+        this.value = value;
+    }
+
+    public void addPreTag(HackitTag preTag){
+        if(preTag == null) return;
+        this.header.addPreTag(preTag);
+    }
+
+    public void addPreTags(Set<HackitTag> preTags){
+        this.header.addPreTags(preTags);
+    }
+
+    public void addPostTag(HackitTag postTag){
+        if(postTag == null) return;
+        this.header.addPostTag(postTag);
+    }
+
+    public void addPostTags(Set<HackitTag> postTags){
+        this.header.addPostTags(postTags);
+    }
+
+    public Set<HackitTag> getPreTag(){ return this.header.getPreTags();}
+
+    public Set<HackitTag> getPostTag(){ return this.header.getPostTags();}
+
 }

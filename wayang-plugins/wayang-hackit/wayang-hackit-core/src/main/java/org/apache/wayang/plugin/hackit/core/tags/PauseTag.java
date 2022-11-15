@@ -50,7 +50,7 @@ public class PauseTag extends HackitTag  {
     @Override
     public boolean isHaltJob() {
         //TODO: set the correct value to this return
-        return false;
+        return true;
     }
 
     @Override
@@ -70,5 +70,10 @@ public class PauseTag extends HackitTag  {
     @Override
     public int hashCode() {
         return 5;
+    }
+
+    @Override
+    public String toString(){
+        return "PauseTag";
     }
 }

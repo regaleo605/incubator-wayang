@@ -18,11 +18,14 @@
 package org.apache.wayang.plugin.hackit.core.sniffer;
 
 import org.apache.wayang.plugin.hackit.core.sniffer.actor.Actor;
+import org.apache.wayang.plugin.hackit.core.sniffer.clone.BasicCloner;
 import org.apache.wayang.plugin.hackit.core.sniffer.clone.Cloner;
+import org.apache.wayang.plugin.hackit.core.sniffer.inject.EmptyInjector;
 import org.apache.wayang.plugin.hackit.core.sniffer.inject.Injector;
 import org.apache.wayang.plugin.hackit.core.sniffer.shipper.Shipper;
 import org.apache.wayang.plugin.hackit.core.sniffer.shipper.sender.Sender;
 import org.apache.wayang.plugin.hackit.core.sniffer.shipper.receiver.Receiver;
+import org.apache.wayang.plugin.hackit.core.sniffer.sniff.SingleTagToSniff;
 import org.apache.wayang.plugin.hackit.core.sniffer.sniff.Sniff;
 import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 
@@ -115,6 +118,21 @@ public class
      */
     public HackitSniffer() {
         //TODO this over configuration file
+        this.not_first = false;
+    }
+
+    public HackitSniffer(Shipper<HackitTuple<K, T>, SentType, SenderObj, ReceiverObj> shipper){
+        this.hackItInjector = new EmptyInjector<>();
+        this.actorFunction = new Actor<HackitTuple<K, T>>() {
+            @Override
+            public boolean is_sendout(HackitTuple<K, T> value) {
+                if(value.getHeader().isSendOut()) return true;
+                return false;
+            }
+        };
+        this.shipper = shipper;
+        this.hackItCloner = (Cloner<HackitTuple<K, T>, SentType>) new BasicCloner<HackitTuple<K, T>>();
+        this.hackItSniff= new SingleTagToSniff();
         this.not_first = false;
     }
 

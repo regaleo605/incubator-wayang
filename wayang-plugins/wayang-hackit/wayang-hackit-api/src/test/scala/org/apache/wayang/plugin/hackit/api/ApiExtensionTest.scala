@@ -30,7 +30,7 @@ import org.junit.jupiter.api.{BeforeAll, BeforeEach}
 
 
 class ApiExtensionTest {
-
+/*
   @BeforeEach
   def setUp() ={
 //    DataQuantaFactory.setTemplate(DataQuantaHackit);
@@ -67,5 +67,7 @@ class ApiExtensionTest {
 //    val expectedOutputValues = inputValues.map(_ + 2)
 //    Assert.assertArrayEquals(expectedOutputValues, outputValues.toArray)
   }
+
+ */
 
 }

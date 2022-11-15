@@ -31,14 +31,14 @@ public class DebugTag extends HackitTag  {
     /**
      * Default constructor
      */
-    private DebugTag(){
+    public DebugTag(){
         super();
     }
 
     @Override
     public boolean isSendOut() {
         //TODO: set the correct value to this return
-        return false;
+        return true;
     }
 
     @Override
@@ -70,5 +70,10 @@ public class DebugTag extends HackitTag  {
     @Override
     public int hashCode() {
         return 2;
+    }
+
+    @Override
+    public String toString(){
+        return "DebugTag";
     }
 }

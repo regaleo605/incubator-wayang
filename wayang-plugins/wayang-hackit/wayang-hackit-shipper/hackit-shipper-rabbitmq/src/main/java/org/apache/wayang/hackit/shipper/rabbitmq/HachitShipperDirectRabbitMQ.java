@@ -60,6 +60,11 @@ public class HachitShipperDirectRabbitMQ<K, T, ST, HackSender extends Sender<ST>
     }
 
     @Override
+    protected HackReceiver createSignalReceiver() {
+        return (HackReceiver) new ReceiverMultiChannelRabbitMQ(this.connect());
+    }
+
+    @Override
     public boolean hasNext() {
         return false;
     }
@@ -76,7 +81,8 @@ public class HachitShipperDirectRabbitMQ<K, T, ST, HackSender extends Sender<ST>
 
             try {
                 //is = new FileInputStream("../../resources/rabbitmq-config.properties");
-                is = new FileInputStream("C:\\Users\\Admin\\Desktop\\hackit\\hackit-shipper\\hackit-shipper-rabbitmq\\src\\main\\resources\\rabbitmq-config.properties");
+                //is = new FileInputStream("C:\\Users\\Admin\\Desktop\\hackit\\hackit-shipper\\hackit-shipper-rabbitmq\\src\\main\\resources\\rabbitmq-config.properties");
+                is = new FileInputStream("/home/matthew/Downloads/BA/updatedWayang28/incubator-wayang/wayang-plugins/wayang-hackit/wayang-hackit-shipper/hackit-shipper-rabbitmq/src/main/resources/rabbitmq-config.properties");
                 prop.load(is);
             } catch(IOException e) {
                 throw new RuntimeException(e);

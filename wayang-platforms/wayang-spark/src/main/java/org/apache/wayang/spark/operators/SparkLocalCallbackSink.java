@@ -27,6 +27,7 @@ import org.apache.wayang.core.platform.ChannelInstance;
 import org.apache.wayang.core.platform.lineage.ExecutionLineageNode;
 import org.apache.wayang.core.types.DataSetType;
 import org.apache.wayang.core.util.Tuple;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 import org.apache.wayang.spark.channels.RddChannel;
 import org.apache.wayang.spark.execution.SparkExecutor;
 
@@ -50,6 +51,9 @@ public class SparkLocalCallbackSink<T extends Serializable> extends LocalCallbac
         super(callback, type);
     }
 
+    private boolean value = false;
+
+
     /**
      * Copies an instance (exclusive of broadcasts).
      *
@@ -57,6 +61,7 @@ public class SparkLocalCallbackSink<T extends Serializable> extends LocalCallbac
      */
     public SparkLocalCallbackSink(LocalCallbackSink<T> that) {
         super(that);
+        this.value =that.isValue();
     }
 
     @Override
@@ -69,9 +74,14 @@ public class SparkLocalCallbackSink<T extends Serializable> extends LocalCallbac
         assert outputs.length == this.getNumOutputs();
 
         final RddChannel.Instance input = (RddChannel.Instance) inputs[0];
-        final JavaRDD<T> inputRdd = input.provideRdd();
-        inputRdd.toLocalIterator().forEachRemaining(this.callback);
 
+        if(isValue()){
+            JavaRDD<HackitTuple<Object,T>> inputRdd = input.provideHackitRDD();
+            inputRdd.map(x ->x.getValue()).toLocalIterator().forEachRemaining(this.callback);
+        } else {
+            final JavaRDD<T> inputRdd = input.provideRdd();
+            inputRdd.toLocalIterator().forEachRemaining(this.callback);
+        }
         return ExecutionOperator.modelEagerExecution(inputs, outputs, operatorContext);
     }
 

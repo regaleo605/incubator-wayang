@@ -27,6 +27,7 @@ import org.apache.wayang.core.platform.ChannelDescriptor;
 import org.apache.wayang.core.platform.ChannelInstance;
 import org.apache.wayang.core.platform.lineage.ExecutionLineageNode;
 import org.apache.wayang.core.util.Tuple;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 import org.apache.wayang.spark.channels.RddChannel;
 import org.apache.wayang.spark.execution.SparkExecutor;
 
@@ -39,6 +40,9 @@ import java.util.List;
  * Provides a {@link Collection} to a Spark job.
  */
 public class SparkTextFileSource extends TextFileSource implements SparkExecutionOperator {
+
+    private boolean isHackit = false;
+
 
     public SparkTextFileSource(String inputUrl, String encoding) {
         super(inputUrl, encoding);
@@ -55,6 +59,7 @@ public class SparkTextFileSource extends TextFileSource implements SparkExecutio
      */
     public SparkTextFileSource(TextFileSource that) {
         super(that);
+        this.isHackit =that.isHackit();
     }
 
     @Override
@@ -69,7 +74,12 @@ public class SparkTextFileSource extends TextFileSource implements SparkExecutio
         RddChannel.Instance output = (RddChannel.Instance) outputs[0];
         final JavaRDD<String> rdd = sparkExecutor.sc.textFile(this.getInputUrl());
         this.name(rdd);
-        output.accept(rdd, sparkExecutor);
+        if(isHackit){
+            JavaRDD<HackitTuple<Object,String>> hrdd = rdd.map(x -> new HackitTuple(x));
+            output.accept(hrdd, sparkExecutor);
+        } else {
+            output.accept(rdd, sparkExecutor);
+        }
 
         ExecutionLineageNode prepareLineageNode = new ExecutionLineageNode(operatorContext);
         prepareLineageNode.add(LoadProfileEstimators.createFromSpecification(
