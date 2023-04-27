@@ -27,8 +27,12 @@ import org.apache.wayang.core.optimizer.cardinality.CardinalityEstimator;
 import org.apache.wayang.core.optimizer.cardinality.DefaultCardinalityEstimator;
 import org.apache.wayang.core.plan.wayangplan.UnaryToUnaryOperator;
 import org.apache.wayang.core.types.DataSetType;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * This operator groups the elements of a data set and aggregates the groups.
@@ -38,6 +42,14 @@ public class ReduceByOperator<Type, Key> extends UnaryToUnaryOperator<Type, Type
     protected final TransformationDescriptor<Type, Key> keyDescriptor;
 
     protected final ReduceDescriptor<Type> reduceDescriptor;
+
+    protected TransformationDescriptor<Type,Type> pre;
+
+    protected TransformationDescriptor<Type,Type> post;
+    protected boolean isHackIt = false;
+    public boolean isHackIt(){return this.isHackIt;}
+    public TransformationDescriptor<Type,Type> getPre(){return this.pre;}
+    public TransformationDescriptor<Type,Type> getPost(){return this.post;}
 
     /**
      * Creates a new instance.
@@ -50,6 +62,16 @@ public class ReduceByOperator<Type, Key> extends UnaryToUnaryOperator<Type, Type
                 new ReduceDescriptor<>(reduceDescriptor, typeClass));
     }
 
+    public ReduceByOperator(FunctionDescriptor.SerializableFunction<Type, Key> keyFunction,
+                            FunctionDescriptor.SerializableBinaryOperator<Type> reduceDescriptor,
+                            Class<Key> keyClass,
+                            Class<Type> typeClass,
+                            TransformationDescriptor<Type,Type> pre,
+                            TransformationDescriptor<Type,Type> post) {
+        this(new TransformationDescriptor<>(keyFunction, typeClass, keyClass),
+                new ReduceDescriptor<>(reduceDescriptor, typeClass),pre,post);
+    }
+
     /**
      * Creates a new instance.
      *
@@ -60,6 +82,15 @@ public class ReduceByOperator<Type, Key> extends UnaryToUnaryOperator<Type, Type
                             ReduceDescriptor<Type> reduceDescriptor) {
         this(keyDescriptor, reduceDescriptor, DataSetType.createDefault(keyDescriptor.getInputType()));
     }
+
+    //HackIt version
+    public ReduceByOperator(TransformationDescriptor<Type, Key> keyDescriptor,
+                            ReduceDescriptor<Type> reduceDescriptor,
+                            TransformationDescriptor<Type,Type> pre,
+                            TransformationDescriptor<Type,Type> post) {
+        this(keyDescriptor, reduceDescriptor, DataSetType.createDefault(keyDescriptor.getInputType()),pre,post);
+    }
+
 
     /**
      * Creates a new instance.
@@ -74,6 +105,19 @@ public class ReduceByOperator<Type, Key> extends UnaryToUnaryOperator<Type, Type
         super(type, type, true);
         this.keyDescriptor = keyDescriptor;
         this.reduceDescriptor = reduceDescriptor;
+    }
+
+    public ReduceByOperator(TransformationDescriptor<Type, Key> keyDescriptor,
+                            ReduceDescriptor<Type> reduceDescriptor,
+                            DataSetType<Type> type,
+                            TransformationDescriptor<Type,Type> pre,
+                            TransformationDescriptor<Type,Type> post) {
+        super(type, type, true);
+        this.keyDescriptor = keyDescriptor;
+        this.reduceDescriptor = reduceDescriptor;
+        this.pre = pre;
+        this.post = post;
+        this.isHackIt = true;
     }
 
     /**

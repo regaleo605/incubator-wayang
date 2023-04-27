@@ -36,16 +36,13 @@ import org.apache.wayang.java.channels.CollectionChannel;
 import org.apache.wayang.java.channels.JavaChannelInstance;
 import org.apache.wayang.java.channels.StreamChannel;
 import org.apache.wayang.java.execution.JavaExecutor;
+import org.apache.wayang.java.plugin.hackit.HackitStream;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -54,6 +51,13 @@ import java.util.stream.Stream;
 public class JavaJoinOperator<InputType0, InputType1, KeyType>
         extends JoinOperator<InputType0, InputType1, KeyType>
         implements JavaExecutionOperator {
+
+    private HackitTag preTag;
+    private HackitTag postTag;
+    private boolean isHackIt = false;
+
+    private Set<HackitTag> preTags;
+    private Set<HackitTag> postTags;
 
     /**
      * Creates a new instance.
@@ -73,6 +77,11 @@ public class JavaJoinOperator<InputType0, InputType1, KeyType>
      */
     public JavaJoinOperator(JoinOperator<InputType0, InputType1, KeyType> that) {
         super(that);
+        this.preTag =that.getPreTag();
+        this.postTag = that.getPostTag();
+        this.isHackIt = that.isHackIt();
+        this.preTags = that.getPreTags();
+        this.postTags = that.getPostTags();
     }
 
     @Override
@@ -83,6 +92,8 @@ public class JavaJoinOperator<InputType0, InputType1, KeyType>
             OptimizationContext.OperatorContext operatorContext) {
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
+
+        if(isHackIt) return  hackit(inputs,outputs,javaExecutor,operatorContext);
 
         final Function<InputType0, KeyType> keyExtractor0 = javaExecutor.getCompiler().compile(this.keyDescriptor0);
         final Function<InputType1, KeyType> keyExtractor1 = javaExecutor.getCompiler().compile(this.keyDescriptor1);
@@ -154,6 +165,101 @@ public class JavaJoinOperator<InputType0, InputType1, KeyType>
         return new Tuple<>(executionLineageNodes, producedChannelInstances);
     }
 
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            JavaExecutor javaExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+
+        final Function<InputType0, KeyType> keyExtractor0 = javaExecutor.getCompiler().compile(this.keyDescriptor0);
+        final Function<InputType1, KeyType> keyExtractor1 = javaExecutor.getCompiler().compile(this.keyDescriptor1);
+
+        final CardinalityEstimate cardinalityEstimate0 = operatorContext.getInputCardinality(0);
+        final CardinalityEstimate cardinalityEstimate1 = operatorContext.getInputCardinality(1);
+
+        ExecutionLineageNode indexingExecutionLineageNode = new ExecutionLineageNode(operatorContext);
+        indexingExecutionLineageNode.add(LoadProfileEstimators.createFromSpecification(
+                "wayang.java.join.load.indexing", javaExecutor.getConfiguration()
+        ));
+        ExecutionLineageNode probingExecutionLineageNode = new ExecutionLineageNode(operatorContext);
+        probingExecutionLineageNode.add(LoadProfileEstimators.createFromSpecification(
+                "wayang.java.join.load.probing", javaExecutor.getConfiguration()
+        ));
+
+        final Stream<HackitTuple<Object,Tuple2<InputType0, InputType1>>> joinStream;
+        Stream<HackitTuple<Object,Tuple2<InputType0, InputType1>>> result = null;
+        Collection<ExecutionLineageNode> executionLineageNodes = new LinkedList<>();
+        Collection<ChannelInstance> producedChannelInstances = new LinkedList<>();
+
+        boolean isMaterialize0 = cardinalityEstimate0 != null &&
+                cardinalityEstimate1 != null &&
+                cardinalityEstimate0.getGeometricMeanEstimate() <= cardinalityEstimate1.getGeometricMeanEstimate();
+
+        if(isMaterialize0){
+            final int expectedNumElements =
+                    (int) cardinalityEstimate0.getGeometricMeanEstimate();
+            Map<KeyType, Collection<InputType0>> probeTable = new HashMap<>(expectedNumElements);
+            //input as Hackittuple get the value, do the normal join operation but in the new one create the HackitTuple
+
+            Map<KeyType,Collection<HackitTuple<Object,InputType0>>> probing = new HashMap<>(expectedNumElements);
+            ((JavaChannelInstance) inputs[0]).provideStream().forEach(data0 ->
+                    probing.compute((KeyType) new KeyExtractor<>(keyExtractor0).apply((HackitTuple<Object, Object>) data0),
+                            (key,value) -> {
+                                    value = value == null? new LinkedList<>() : value;
+                                    if(this.preTags!=null)((HackitTuple<?, ?>) data0).addPreTags(this.preTags);
+                                    value.add((HackitTuple<Object, InputType0>) data0);
+                                    return value;
+                            }
+                            ));
+            joinStream = ((JavaChannelInstance) inputs[1]).provideStream().flatMap(data1 ->
+                    probing.getOrDefault(
+                            new KeyExtractor<>(keyExtractor1).apply((HackitTuple<Object, Object>) data1),Collections.emptyList())
+                            .stream()
+                            //.map(data0 -> new HackitTuple<>(data0.getHeader(),new Tuple2(data0.getValue(),((HackitTuple<?, ?>) data1).getValue()))
+                            .map(data0 -> new HackitTuple<>(data0.getHeader(),new Tuple2(data0.getValue(),((HackitTuple<?, ?>) data1).getValue()))
+            ));
+            List<HackitTuple<Object,Tuple2<InputType0, InputType1>>> tmp = joinStream.map(x->{
+                if(this.postTags!=null) x.addPostTags(this.postTags);
+                return x;
+            }).collect(Collectors.toList());
+            result = tmp.stream();
+
+            indexingExecutionLineageNode.addPredecessor(inputs[0].getLineage());
+            indexingExecutionLineageNode.collectAndMark(executionLineageNodes, producedChannelInstances);
+            probingExecutionLineageNode.addPredecessor(inputs[1].getLineage());
+        } else {
+            final int expectedNumElements = cardinalityEstimate1 == null ?
+                    1000 :
+                    (int) cardinalityEstimate1.getGeometricMeanEstimate();
+            //no idea why when Collection<HackitTuple<Object,InputType1>> not working at all
+            Map<KeyType, Collection<InputType1>> probeTable = new HashMap<>(expectedNumElements);
+            ((JavaChannelInstance) inputs[1]).<InputType1>provideStream().forEach(dataQuantum1 ->
+                    probeTable.compute((KeyType) new KeyExtractor<>(keyExtractor1).apply((HackitTuple<Object, Object>) dataQuantum1),
+                            (key, value) -> {
+                                value = value == null ? new LinkedList<>() : value;
+                                value.add(((HackitTuple<Object,InputType1>) dataQuantum1).getValue());
+                                return value;
+                            }
+                    )
+            );
+            joinStream = ((JavaChannelInstance) inputs[0]).<InputType0>provideStream().flatMap(dataQuantum0 ->
+                    probeTable.getOrDefault(
+                            new KeyExtractor<>(keyExtractor0).apply((HackitTuple<Object, Object>) dataQuantum0), Collections.emptyList())
+                            .stream()
+                            .map(dataQuantum1 ->new HackitTuple<>(new Tuple2<>(((HackitTuple<Object,InputType0>)dataQuantum0).getValue(), dataQuantum1))));
+            result = joinStream;
+            indexingExecutionLineageNode.addPredecessor(inputs[1].getLineage());
+            indexingExecutionLineageNode.collectAndMark(executionLineageNodes, producedChannelInstances);
+            probingExecutionLineageNode.addPredecessor(inputs[0].getLineage());
+        }
+
+
+        ((StreamChannel.Instance) outputs[0]).accept(result);
+        outputs[0].getLineage().addPredecessor(probingExecutionLineageNode);
+
+        return new Tuple<>(executionLineageNodes, producedChannelInstances);
+    }
+
     @Override
     public Collection<String> getLoadProfileEstimatorConfigurationKeys() {
         return Arrays.asList("wayang.java.join.load.indexing", "wayang.java.join.load.probing");
@@ -184,6 +290,20 @@ public class JavaJoinOperator<InputType0, InputType1, KeyType>
     public List<ChannelDescriptor> getSupportedOutputChannels(int index) {
         assert index <= this.getNumOutputs() || (index == 0 && this.getNumOutputs() == 0);
         return Collections.singletonList(StreamChannel.DESCRIPTOR);
+    }
+
+    private static class KeyExtractor<K,I,O> implements Function<HackitTuple<K,I>,O>{
+        private Function<I,O> function;
+        public KeyExtractor(Function function){
+            this.function = function;
+        }
+
+
+        @Override
+        public O apply(HackitTuple<K, I> kiHackitTuple) {
+            O result = this.function.apply(kiHackitTuple.getValue());
+            return result;
+        }
     }
 
 }

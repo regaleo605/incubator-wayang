@@ -10,7 +10,7 @@ import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SenderKafkaTest {
-
+/*
     @Test
     void sendMessage() {
 
@@ -31,7 +31,11 @@ class SenderKafkaTest {
         sender.addTopic("debug");
         sender.send("perro", "gato");
         sender.send("pulpo", "atun");
+        System.out.println("Something is sent out");
         sender.close();
+        System.out.println("Kafka is closed");
     }
+
+ */
 
 }

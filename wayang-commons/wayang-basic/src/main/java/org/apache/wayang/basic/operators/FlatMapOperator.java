@@ -22,13 +22,18 @@ import org.apache.commons.lang3.Validate;
 import org.apache.wayang.core.api.Configuration;
 import org.apache.wayang.core.function.FlatMapDescriptor;
 import org.apache.wayang.core.function.FunctionDescriptor;
+import org.apache.wayang.core.function.TransformationDescriptor;
 import org.apache.wayang.core.optimizer.OptimizationContext;
 import org.apache.wayang.core.optimizer.ProbabilisticDoubleInterval;
 import org.apache.wayang.core.optimizer.cardinality.CardinalityEstimate;
 import org.apache.wayang.core.plan.wayangplan.UnaryToUnaryOperator;
 import org.apache.wayang.core.types.DataSetType;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A flatmap operator represents semantics as they are known from frameworks, such as Spark and Flink. It pulls each
@@ -42,6 +47,18 @@ public class FlatMapOperator<InputType, OutputType> extends UnaryToUnaryOperator
      */
     protected final FlatMapDescriptor<InputType, OutputType> functionDescriptor;
 
+    protected TransformationDescriptor<InputType,InputType> pre;
+
+    protected TransformationDescriptor<OutputType,OutputType> post;
+
+    protected boolean isHackIt = false;
+    public TransformationDescriptor<InputType, InputType> getPre(){return this.pre;}
+    public TransformationDescriptor<OutputType,OutputType> getPost(){return this.post;}
+    public boolean isHackIt(){return this.isHackIt;}
+
+
+
+
     /**
      * Creates a new instance.
      */
@@ -50,6 +67,18 @@ public class FlatMapOperator<InputType, OutputType> extends UnaryToUnaryOperator
                 DataSetType.createDefault(functionDescriptor.getOutputType()),
                 true);
         this.functionDescriptor = functionDescriptor;
+    }
+//HackitVersion
+    public FlatMapOperator(FlatMapDescriptor<InputType, OutputType> functionDescriptor
+            ,TransformationDescriptor<InputType,InputType> pre
+            ,TransformationDescriptor<OutputType, OutputType> post) {
+        super(DataSetType.createDefault(functionDescriptor.getInputType()),
+                DataSetType.createDefault(functionDescriptor.getOutputType()),
+                true);
+        this.functionDescriptor = functionDescriptor;
+        this.pre = pre;
+        this.post = post;
+        this.isHackIt = true;
     }
 
     /**
@@ -61,6 +90,15 @@ public class FlatMapOperator<InputType, OutputType> extends UnaryToUnaryOperator
         this(new FlatMapDescriptor<>(function, inputTypeClass, outputTypeClass));
     }
 
+    //HackitVersion
+    public FlatMapOperator(FunctionDescriptor.SerializableFunction<InputType, Iterable<OutputType>> function,
+                           Class<InputType> inputTypeClass,
+                           Class<OutputType> outputTypeClass
+            ,TransformationDescriptor<InputType,InputType> pre
+            ,TransformationDescriptor<OutputType, OutputType> post) {
+        this(new FlatMapDescriptor<>(function, inputTypeClass, outputTypeClass),pre,post);
+    }
+
     /**
      * Creates a new instance.
      */
@@ -70,6 +108,19 @@ public class FlatMapOperator<InputType, OutputType> extends UnaryToUnaryOperator
         super(inputType, outputType, true);
         this.functionDescriptor = functionDescriptor;
     }
+//HackItversion
+    public FlatMapOperator(FlatMapDescriptor<InputType, OutputType> functionDescriptor,
+                           DataSetType<InputType> inputType,
+                           DataSetType<OutputType> outputType
+            ,TransformationDescriptor<InputType,InputType> pre
+            ,TransformationDescriptor<OutputType, OutputType> post) {
+        super(inputType, outputType, true);
+        this.functionDescriptor = functionDescriptor;
+        this.pre = pre;
+        this.post = post;
+        this.isHackIt = true;
+    }
+
 
     /**
      * Copies an instance (exclusive of broadcasts).
@@ -79,6 +130,9 @@ public class FlatMapOperator<InputType, OutputType> extends UnaryToUnaryOperator
     public FlatMapOperator(FlatMapOperator<InputType, OutputType> that) {
         super(that);
         this.functionDescriptor = that.functionDescriptor;
+        this.isHackIt = that.isHackIt();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     public FlatMapDescriptor<InputType, OutputType> getFunctionDescriptor() {

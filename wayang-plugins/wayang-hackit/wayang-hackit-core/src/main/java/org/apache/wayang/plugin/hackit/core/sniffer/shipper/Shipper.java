@@ -121,7 +121,7 @@ public abstract class Shipper<T_IN, T_OUT, SenderObj extends Sender<T_OUT>, Rece
      * @param topic list of topic where the consumer will be consuming
      */
     public void subscribeAsConsumer(String... topic){
-        this.subscribeAsProducer("default", topic);
+        this.subscribeAsConsumer("default", topic);
     }
 
     /**
@@ -168,5 +168,24 @@ public abstract class Shipper<T_IN, T_OUT, SenderObj extends Sender<T_OUT>, Rece
             throw new RuntimeException("The Receiver of the Shipper is not instanciated");
         }
         return this.receiver_instance.getElements();
+    }
+
+    protected Receiver signal_receiver;
+
+    protected abstract Receiver createSignalReceiver();
+    public void subscribeAsSignalReceiver(){
+        this.signal_receiver = this.createSignalReceiver();
+        this.signal_receiver.init();
+    }
+
+    public void unsubscribeAsSignalReceiver() {
+        if( this.signal_receiver == null) return;
+        this.signal_receiver.close();
+    }
+    public Iterator<T_IN> getNextSignal(){
+        if( this.signal_receiver == null){
+            throw new RuntimeException("The Receiver of the Shipper is not instanciated");
+        }
+        return this.signal_receiver.getElements();
     }
 }

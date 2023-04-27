@@ -38,7 +38,7 @@ public class LogTag extends HackitTag  {
     @Override
     public boolean isSendOut() {
         //TODO: set the correct value to this return
-        return false;
+        return true;
     }
 
     @Override
@@ -71,5 +71,9 @@ public class LogTag extends HackitTag  {
     @Override
     public int hashCode() {
         return 4;
+    }
+    @Override
+    public String toString(){
+        return "LogTag";
     }
 }

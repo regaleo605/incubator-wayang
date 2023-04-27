@@ -92,4 +92,5 @@ public abstract class HackitTag implements Serializable, ActionGroup {
     public int hashCode() {
         return 0;
     }
+
 }

@@ -29,6 +29,7 @@ import org.apache.wayang.core.platform.ChannelDescriptor;
 import org.apache.wayang.core.platform.ChannelInstance;
 import org.apache.wayang.core.platform.Executor;
 import org.apache.wayang.core.util.Actions;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 import org.apache.wayang.spark.execution.SparkExecutor;
 
 import java.util.OptionalLong;
@@ -100,6 +101,10 @@ public class RddChannel extends Channel {
         @SuppressWarnings("unchecked")
         public <T> JavaRDD<T> provideRdd() {
             return (JavaRDD<T>) this.rdd;
+        }
+
+        public <K,T> JavaRDD<HackitTuple<K,T>> provideHackitRDD(){
+            return (JavaRDD<HackitTuple<K,T>>) this.rdd;
         }
 
         @Override

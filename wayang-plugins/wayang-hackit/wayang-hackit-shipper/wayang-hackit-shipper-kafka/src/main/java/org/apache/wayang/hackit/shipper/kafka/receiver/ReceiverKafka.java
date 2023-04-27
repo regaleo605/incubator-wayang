@@ -12,6 +12,8 @@ import java.util.*;
 
 public class ReceiverKafka<K, T> extends Receiver<HackitTuple<K, T>> implements PSProtocol {
 
+    private String exchange_name = "default_consumer";
+
     //TODO Get from configuration
     static Map<String, String> KAFKA_MAPPING;
     static {
@@ -25,10 +27,17 @@ public class ReceiverKafka<K, T> extends Receiver<HackitTuple<K, T>> implements 
     Consumer<K, T> consumer;
     Properties config;
     List<String> topics;
+    String topic;
 
     public ReceiverKafka(Properties config){
         this.config = config;
         this.topics = new ArrayList<>();
+    }
+
+    public ReceiverKafka(Properties config, String topic){
+        this.config = config;
+        this.topics = new ArrayList<>();
+        this.topic = topic;
     }
 
 
@@ -42,13 +51,19 @@ public class ReceiverKafka<K, T> extends Receiver<HackitTuple<K, T>> implements 
 
     @Override
     public PSProtocol addExchange(String exchange) {
-        return null;
+        this.exchange_name = exchange;
+        return this;
     }
 
     @Override
     public void init() {
         this.consumer =
                 new KafkaConsumer<>(config);
+        if(this.topic!=null){
+            this.consumer.subscribe(Arrays.asList(this.topic));
+        } else {
+            this.consumer.subscribe(Arrays.asList("debug","other"));
+        }
     }
 
     @Override
@@ -68,10 +83,7 @@ public class ReceiverKafka<K, T> extends Receiver<HackitTuple<K, T>> implements 
 
             List<HackitTuple<K, T>> list = new ArrayList<>();
             consumerRecords.forEach(record ->{
-                HackitTuple<K, T> result = new HackitTuple<>(
-                        record.value()
-                );
-                // System.out.println("received " + record.value());
+                HackitTuple<K,T> result = new HackitTuple<>(record.value());
                 list.add(result);
             });
 

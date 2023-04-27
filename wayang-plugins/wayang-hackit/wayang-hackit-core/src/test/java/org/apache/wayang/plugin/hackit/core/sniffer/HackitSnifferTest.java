@@ -39,6 +39,9 @@ class HackitSnifferTest {
                     }
 
                     @Override
+                    protected Receiver createSignalReceiver() {return new MockUpReceiver();}
+
+                    @Override
                     public boolean hasNext() {
                         return false;
                     }
@@ -70,6 +73,11 @@ class HackitSnifferTest {
 
                     @Override
                     protected Receiver createReceiverInstance() {
+                        return new MockUpReceiver();
+                    }
+
+                    @Override
+                    protected Receiver createSignalReceiver() {
                         return new MockUpReceiver();
                     }
 
@@ -107,6 +115,11 @@ class HackitSnifferTest {
                     protected Receiver createReceiverInstance() {
                         return new MockUpReceiver();
                     }
+                    @Override
+                    protected Receiver createSignalReceiver() {
+                        return new MockUpReceiver();
+                    }
+
 
                     @Override
                     public boolean hasNext() {
@@ -147,6 +160,10 @@ class HackitSnifferTest {
                     protected Receiver createReceiverInstance() {
                         return new MockUpReceiver();
                     }
+                    @Override
+                    protected Receiver createSignalReceiver() {
+                        return new MockUpReceiver();
+                    }
 
                     @Override
                     public boolean hasNext() {
@@ -170,6 +187,10 @@ class HackitSnifferTest {
 
             @Override
             protected Receiver createReceiverInstance() {
+                return new MockUpReceiver();
+            }
+            @Override
+            protected Receiver createSignalReceiver() {
                 return new MockUpReceiver();
             }
 
@@ -201,6 +222,10 @@ class HackitSnifferTest {
 
                     @Override
                     protected Receiver createReceiverInstance() {
+                        return new MockUpReceiver();
+                    }
+                    @Override
+                    protected Receiver createSignalReceiver() {
                         return new MockUpReceiver();
                     }
 
@@ -236,6 +261,10 @@ class HackitSnifferTest {
 
                     @Override
                     protected Receiver createReceiverInstance() {
+                        return new MockUpReceiver();
+                    }
+                    @Override
+                    protected Receiver createSignalReceiver() {
                         return new MockUpReceiver();
                     }
 

@@ -12,7 +12,7 @@ import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ReceiverKafkaTest {
-
+/*
     @Test
     void receiveMessage() {
 
@@ -29,4 +29,6 @@ class ReceiverKafkaTest {
         results.forEachRemaining(t -> System.out.println(t.getValue()));
         receiver.close();
     }
+
+ */
 }

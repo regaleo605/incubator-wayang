@@ -35,6 +35,10 @@ import org.apache.wayang.java.channels.CollectionChannel;
 import org.apache.wayang.java.channels.JavaChannelInstance;
 import org.apache.wayang.java.channels.StreamChannel;
 import org.apache.wayang.java.execution.JavaExecutor;
+import org.apache.wayang.java.plugin.hackit.HackitStream;
+import org.apache.wayang.java.plugin.hackit.ruler.JavaFunctionRuler;
+import org.apache.wayang.java.plugin.hackit.ruler.JavaReducingCollectorRuler;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,6 +62,10 @@ public class JavaReduceByOperator<Type, KeyType>
         extends ReduceByOperator<Type, KeyType>
         implements JavaExecutionOperator {
 
+    private TransformationDescriptor<Type,Type> pre;
+    private TransformationDescriptor<Type,Type> post;
+    private boolean isHackIt = false;
+
 
     /**
      * Creates a new instance.
@@ -78,6 +86,9 @@ public class JavaReduceByOperator<Type, KeyType>
      */
     public JavaReduceByOperator(ReduceByOperator<Type, KeyType> that) {
         super(that);
+        this.isHackIt = that.isHackIt();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     @Override
@@ -89,6 +100,8 @@ public class JavaReduceByOperator<Type, KeyType>
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
 
+        if(isHackIt) return hackit(inputs,outputs,javaExecutor,operatorContext);
+
         final Function<Type, KeyType> keyExtractor = javaExecutor.getCompiler().compile(this.keyDescriptor);
         final BinaryOperator<Type> reduceFunction = javaExecutor.getCompiler().compile(this.reduceDescriptor);
         JavaExecutor.openFunction(this, reduceFunction, inputs, operatorContext);
@@ -97,6 +110,29 @@ public class JavaReduceByOperator<Type, KeyType>
                 Collectors.groupingBy(keyExtractor, new ReducingCollector<>(reduceFunction))
         );
         ((CollectionChannel.Instance) outputs[0]).accept(reductionResult.values());
+
+        return ExecutionOperator.modelEagerExecution(inputs, outputs, operatorContext);
+    }
+
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            JavaExecutor javaExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+
+        Function<Type,Type> preFunction = null;
+        Function<Type,Type> postFunction = null;
+        if(this.pre!=null) preFunction = javaExecutor.getCompiler().compile(this.pre);
+        if(this.post!=null) postFunction = javaExecutor.getCompiler().compile(this.post);
+
+        final Function<Type, KeyType> keyExtractor = javaExecutor.getCompiler().compile(this.keyDescriptor);
+        final BinaryOperator<Type> reduceFunction = javaExecutor.getCompiler().compile(this.reduceDescriptor);
+        JavaExecutor.openFunction(this, reduceFunction, inputs, operatorContext);
+
+        final Map hackitResult = new HackitStream<>(((JavaChannelInstance) inputs[0]).provideStream()).
+                reduceBy(keyExtractor,reduceFunction,preFunction,postFunction);
+
+        ((CollectionChannel.Instance) outputs[0]).accept(hackitResult.values());
 
         return ExecutionOperator.modelEagerExecution(inputs, outputs, operatorContext);
     }

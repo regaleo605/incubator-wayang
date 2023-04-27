@@ -19,6 +19,8 @@ package org.apache.wayang.plugin.hackit.core.tuple.header;
 
 import org.apache.wayang.plugin.hackit.core.action.ActionGroup;
 import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
+import org.apache.wayang.plugin.hackit.core.tags.TraceTag;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -154,11 +156,34 @@ public abstract class Header<K> implements Serializable, ActionGroup {
      * Remove all {@link org.apache.wayang.plugin.hackit.core.tuple.header.Header}'s tags and set all possible options to false
      */
     public void clearTags(){
-        this.tags.clear();
+        if(this.tags!=null){
+            //if(this.tags.contains(new TraceTag())) hasTrace =true;
+            this.tags.clear();
+            //this.is_signal = false;
+        }
         this.has_callback_tag = false;
         this.has_haltjob_tag  = false;
         this.has_sendout_tag  = false;
         this.has_skip_tag     = false;
+        //if(hasTrace) this.tags.add(new TraceTag());
+    }
+
+    public void clearPrePostTags(){
+        if(this.preTags!=null){
+            //if(this.tags.contains(new TraceTag())) hasTrace =true;
+            this.preTags.clear();
+            //this.is_signal = false;
+        }
+        if(this.postTags!=null){
+            //if(this.tags.contains(new TraceTag())) hasTrace =true;
+            this.postTags.clear();
+            //this.is_signal = false;
+        }
+        this.has_callback_tag = false;
+        this.has_haltjob_tag  = false;
+        this.has_sendout_tag  = false;
+        this.has_skip_tag     = false;
+        //if(hasTrace) this.tags.add(new TraceTag());
     }
 
     /**
@@ -206,6 +231,7 @@ public abstract class Header<K> implements Serializable, ActionGroup {
      * @param tag {@link HackitTag} that could require new {@link org.apache.wayang.plugin.hackit.core.action.Action}s
      */
     private void updateActionVector(HackitTag tag){
+        if(tag == null) return;
         this.has_callback_tag = tag.hasCallback() || this.has_callback_tag;
         this.has_haltjob_tag  = tag.isHaltJob() || this.has_haltjob_tag;
         this.has_sendout_tag  = tag.isSendOut() || this.has_sendout_tag;
@@ -246,5 +272,81 @@ public abstract class Header<K> implements Serializable, ActionGroup {
     @Override
     public boolean isSkip() {
         return this.has_skip_tag;
+    }
+
+    public void addPreTags(Set<HackitTag> preTags){
+        if(this.preTags == null){
+            this.preTags = new HashSet<>();
+        }
+        this.preTags.addAll(preTags);
+        preTags.stream()
+                .forEach(
+                        this::updateActionVector
+                )
+        ;
+    }
+
+    public void addPostTags(Set<HackitTag> postTags){
+        if(this.postTags == null){
+            this.postTags = new HashSet<>();
+        }
+        this.postTags.addAll(postTags);
+        postTags.stream()
+                .forEach(
+                        this::updateActionVector
+                )
+        ;
+    }
+
+    public Set<HackitTag> getTag(){
+        return this.tags;
+    }
+
+    private Set<HackitTag> preTags;
+    private Set<HackitTag> postTags;
+
+    public void addPreTag(HackitTag preTag){
+        if(this.preTags == null){
+            this.preTags = new HashSet<>();
+            this.preTags.add(preTag);
+            updateActionVector(preTag);
+        } else {
+            this.preTags.add(preTag);
+            updateActionVector(preTag);
+        }
+    }
+
+    public void addPostTag(HackitTag postTag){
+        if(this.postTags == null){
+            this.postTags = new HashSet<>();
+            this.postTags.add(postTag);
+            updateActionVector(postTag);
+        } else {
+            this.postTags.add(postTag);
+            updateActionVector(postTag);
+        }
+    }
+
+    public Set<HackitTag> getPreTags(){return this.preTags;}
+    public Set<HackitTag> getPostTags(){return this.postTags;}
+
+    public Header<K> mergeHeaderTags(HackitTuple other){
+        if(this.preTags==null){
+            this.preTags = new HashSet<>();
+        }
+        if(this.postTags ==null){
+            this.postTags = new HashSet<>();
+        }
+        if(other.getPreTag() == null){
+            this.preTags.addAll(Collections.emptySet());
+        } else {
+            if(other.getPreTag().size() != 0) this.preTags.addAll(other.getPreTag());
+        }
+        if(other.getPostTag() == null){
+            this.postTags.addAll(Collections.emptySet());
+        } else {
+            if(other.getPostTag().size() != 0) this.postTags.addAll(other.getPostTag());
+        }
+        return this;
     }
 }

@@ -23,6 +23,7 @@ import org.apache.spark.api.java.function.Function;
 import org.apache.wayang.basic.operators.FilterOperator;
 import org.apache.wayang.core.api.Configuration;
 import org.apache.wayang.core.function.PredicateDescriptor;
+import org.apache.wayang.core.function.TransformationDescriptor;
 import org.apache.wayang.core.optimizer.OptimizationContext;
 import org.apache.wayang.core.optimizer.costs.LoadProfileEstimator;
 import org.apache.wayang.core.optimizer.costs.LoadProfileEstimators;
@@ -32,15 +33,14 @@ import org.apache.wayang.core.platform.ChannelInstance;
 import org.apache.wayang.core.platform.lineage.ExecutionLineageNode;
 import org.apache.wayang.core.types.DataSetType;
 import org.apache.wayang.core.util.Tuple;
+import org.apache.wayang.plugin.hackit.core.Hackit;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
 import org.apache.wayang.spark.channels.BroadcastChannel;
 import org.apache.wayang.spark.channels.RddChannel;
 import org.apache.wayang.spark.execution.SparkExecutor;
+import org.apache.wayang.spark.plugin.hackit.HackitRDD;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Spark implementation of the {@link FilterOperator}.
@@ -48,6 +48,11 @@ import java.util.Optional;
 public class SparkFilterOperator<Type>
         extends FilterOperator<Type>
         implements SparkExecutionOperator {
+
+    private TransformationDescriptor<Type,Type> pre;
+    private TransformationDescriptor<Type,Type> post;
+    private boolean isHackIt = false;
+
 
     /**
      * Creates a new instance.
@@ -65,6 +70,9 @@ public class SparkFilterOperator<Type>
      */
     public SparkFilterOperator(FilterOperator<Type> that) {
         super(that);
+        this.isHackIt = that.isHackIt();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     @Override
@@ -76,6 +84,8 @@ public class SparkFilterOperator<Type>
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
 
+        if (isHackIt) return hackit(inputs,outputs,sparkExecutor,operatorContext);
+
         final Function<Type, Boolean> filterFunction = sparkExecutor.getCompiler().compile(
                 this.predicateDescriptor, this, operatorContext, inputs
         );
@@ -86,6 +96,31 @@ public class SparkFilterOperator<Type>
         ((RddChannel.Instance) outputs[0]).accept(outputRdd, sparkExecutor);
 
         return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
+    }
+
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            SparkExecutor sparkExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+
+        final Function<Type, Boolean> filterFunction = sparkExecutor.getCompiler().compile(
+                this.predicateDescriptor, this, operatorContext, inputs
+        );
+
+        Function<Type,Type> preFunction = null;
+        Function<Type,Type> postFunction = null;
+        if(this.pre.getJavaImplementation()!=null) preFunction = sparkExecutor.getCompiler().compile(this.pre,this,operatorContext,inputs);
+        if(this.post.getJavaImplementation()!=null) postFunction = sparkExecutor.getCompiler().compile(this.post,this,operatorContext,inputs);
+
+
+        final JavaRDD<Type> outputRdd = new HackitRDD<>(((RddChannel.Instance) inputs[0]).provideHackitRDD()).
+                filter((Function<Object, Boolean>) filterFunction,preFunction,postFunction).getRdd();
+        this.name(outputRdd);
+        ((RddChannel.Instance) outputs[0]).accept(outputRdd, sparkExecutor);
+
+        return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
+
     }
 
     @Override

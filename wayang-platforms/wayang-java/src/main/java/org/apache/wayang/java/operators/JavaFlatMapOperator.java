@@ -21,6 +21,7 @@ package org.apache.wayang.java.operators;
 import org.apache.wayang.basic.operators.FlatMapOperator;
 import org.apache.wayang.core.api.Configuration;
 import org.apache.wayang.core.function.FlatMapDescriptor;
+import org.apache.wayang.core.function.TransformationDescriptor;
 import org.apache.wayang.core.optimizer.OptimizationContext;
 import org.apache.wayang.core.optimizer.costs.LoadProfileEstimator;
 import org.apache.wayang.core.optimizer.costs.LoadProfileEstimators;
@@ -34,14 +35,13 @@ import org.apache.wayang.java.channels.CollectionChannel;
 import org.apache.wayang.java.channels.JavaChannelInstance;
 import org.apache.wayang.java.channels.StreamChannel;
 import org.apache.wayang.java.execution.JavaExecutor;
+import org.apache.wayang.java.plugin.hackit.HackitStream;
+import org.apache.wayang.java.plugin.hackit.ruler.JavaFlatMapRuler;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
+import org.apache.wayang.plugin.hackit.core.tuple.header.Header;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.Spliterator;
-import java.util.Spliterators;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.StreamSupport;
 
@@ -51,6 +51,9 @@ import java.util.stream.StreamSupport;
 public class JavaFlatMapOperator<InputType, OutputType>
         extends FlatMapOperator<InputType, OutputType>
         implements JavaExecutionOperator {
+    private boolean isHackIt = false;
+    private TransformationDescriptor<InputType,InputType> pre;
+    private TransformationDescriptor<OutputType,OutputType> post;
 
     /**
      * Creates a new instance.
@@ -69,6 +72,9 @@ public class JavaFlatMapOperator<InputType, OutputType>
      */
     public JavaFlatMapOperator(FlatMapOperator<InputType, OutputType> that) {
         super(that);
+        this.isHackIt = that.isHackIt();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     @Override
@@ -79,6 +85,8 @@ public class JavaFlatMapOperator<InputType, OutputType>
             OptimizationContext.OperatorContext operatorContext) {
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
+
+        if(isHackIt) return hackit(inputs,outputs,javaExecutor,operatorContext);
 
         final Function<InputType, Iterable<OutputType>> flatmapFunction =
                 javaExecutor.getCompiler().compile(this.functionDescriptor);
@@ -96,6 +104,28 @@ public class JavaFlatMapOperator<InputType, OutputType>
         );
 
         return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
+    }
+
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            JavaExecutor javaExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+
+        final Function<InputType, Iterable<OutputType>> flatmapFunction =
+                javaExecutor.getCompiler().compile(this.functionDescriptor);
+        JavaExecutor.openFunction(this, flatmapFunction, inputs, operatorContext);
+
+        Function<InputType,InputType> preFunction = null;
+        Function<OutputType,OutputType> postFunction = null;
+        if(this.pre!=null) preFunction = javaExecutor.getCompiler().compile(this.pre);
+        if(this.post!=null) postFunction = javaExecutor.getCompiler().compile(this.post);
+
+        ((StreamChannel.Instance) outputs[0]).accept(
+                new HackitStream<>(((JavaChannelInstance) inputs[0]).provideStream()).flatMap(flatmapFunction,preFunction,postFunction).getStream());
+
+        return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
+
     }
 
     @Override

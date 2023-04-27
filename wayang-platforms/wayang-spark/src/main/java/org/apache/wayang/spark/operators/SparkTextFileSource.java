@@ -19,7 +19,9 @@
 package org.apache.wayang.spark.operators;
 
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.function.Function;
 import org.apache.wayang.basic.operators.TextFileSource;
+import org.apache.wayang.core.function.TransformationDescriptor;
 import org.apache.wayang.core.optimizer.OptimizationContext;
 import org.apache.wayang.core.optimizer.costs.LoadProfileEstimators;
 import org.apache.wayang.core.plan.wayangplan.ExecutionOperator;
@@ -27,6 +29,7 @@ import org.apache.wayang.core.platform.ChannelDescriptor;
 import org.apache.wayang.core.platform.ChannelInstance;
 import org.apache.wayang.core.platform.lineage.ExecutionLineageNode;
 import org.apache.wayang.core.util.Tuple;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 import org.apache.wayang.spark.channels.RddChannel;
 import org.apache.wayang.spark.execution.SparkExecutor;
 
@@ -39,6 +42,11 @@ import java.util.List;
  * Provides a {@link Collection} to a Spark job.
  */
 public class SparkTextFileSource extends TextFileSource implements SparkExecutionOperator {
+
+    private boolean isHackit = false;
+
+    private TransformationDescriptor post;
+
 
     public SparkTextFileSource(String inputUrl, String encoding) {
         super(inputUrl, encoding);
@@ -55,6 +63,8 @@ public class SparkTextFileSource extends TextFileSource implements SparkExecutio
      */
     public SparkTextFileSource(TextFileSource that) {
         super(that);
+        this.isHackit =that.isHackit();
+        this.post = that.getPost();
     }
 
     @Override
@@ -69,7 +79,20 @@ public class SparkTextFileSource extends TextFileSource implements SparkExecutio
         RddChannel.Instance output = (RddChannel.Instance) outputs[0];
         final JavaRDD<String> rdd = sparkExecutor.sc.textFile(this.getInputUrl());
         this.name(rdd);
-        output.accept(rdd, sparkExecutor);
+        if(isHackit){
+            Function postFunction = null;
+            if(this.post.getJavaImplementation()!=null) postFunction = sparkExecutor.getCompiler().compile(this.post,this,operatorContext,inputs);
+            Function finalPostFunction = postFunction;
+            JavaRDD<HackitTuple<Object,String>> hrdd = rdd.map(x->{
+                HackitTuple<Object,String> tuple = new HackitTuple<>(x);
+                if(finalPostFunction !=null) tuple = (HackitTuple<Object, String>) finalPostFunction.call(tuple);
+                return tuple;
+            });
+
+            output.accept(hrdd, sparkExecutor);
+        } else {
+            output.accept(rdd, sparkExecutor);
+        }
 
         ExecutionLineageNode prepareLineageNode = new ExecutionLineageNode(operatorContext);
         prepareLineageNode.add(LoadProfileEstimators.createFromSpecification(

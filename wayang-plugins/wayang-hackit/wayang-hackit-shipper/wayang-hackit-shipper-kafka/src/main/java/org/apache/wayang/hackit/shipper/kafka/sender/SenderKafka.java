@@ -28,9 +28,19 @@ public class SenderKafka<K, T> implements Sender<T>, PSProtocol {
     Properties config;
     List<String> topics;
 
+    private int shipperId;
+
     public SenderKafka(Properties config){
         this.config = config;
         this.topics = new ArrayList<>();
+        this.topics.add("debug");
+    }
+
+    public SenderKafka(Properties config,int shipperId){
+        this.config = config;
+        this.topics = new ArrayList<>();
+        this.topics.add("debug");
+        this.topics.add("debug"+shipperId);
     }
 
     public PSProtocol preAddTopic(String... topic) {
@@ -95,6 +105,7 @@ public class SenderKafka<K, T> implements Sender<T>, PSProtocol {
 
     @Override
     public void close() {
+        producer.flush();
         producer.close();
     }
 }

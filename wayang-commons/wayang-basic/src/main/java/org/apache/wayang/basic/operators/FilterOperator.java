@@ -21,13 +21,15 @@ package org.apache.wayang.basic.operators;
 import org.apache.commons.lang3.Validate;
 import org.apache.wayang.core.api.Configuration;
 import org.apache.wayang.core.function.PredicateDescriptor;
+import org.apache.wayang.core.function.TransformationDescriptor;
 import org.apache.wayang.core.optimizer.OptimizationContext;
 import org.apache.wayang.core.optimizer.ProbabilisticDoubleInterval;
 import org.apache.wayang.core.optimizer.cardinality.CardinalityEstimate;
 import org.apache.wayang.core.plan.wayangplan.UnaryToUnaryOperator;
 import org.apache.wayang.core.types.DataSetType;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
 
-import java.util.Optional;
+import java.util.*;
 
 
 /**
@@ -39,6 +41,13 @@ public class FilterOperator<Type> extends UnaryToUnaryOperator<Type, Type> {
      * Function that this operator applies to the input elements.
      */
     protected final PredicateDescriptor<Type> predicateDescriptor;
+    protected TransformationDescriptor<Type,Type> pre;
+    protected TransformationDescriptor<Type,Type> post;
+    public TransformationDescriptor<Type,Type> getPre(){return this.pre;}
+    public TransformationDescriptor<Type,Type> getPost(){return this.post;}
+
+    protected boolean isHackIt = false;
+    public boolean isHackIt(){return this.isHackIt;}
 
     /**
      * Creates a new instance.
@@ -57,6 +66,18 @@ public class FilterOperator<Type> extends UnaryToUnaryOperator<Type, Type> {
         this.predicateDescriptor = predicateDescriptor;
     }
 
+    public FilterOperator(PredicateDescriptor<Type> predicateDescriptor
+            ,TransformationDescriptor<Type,Type> pre
+            ,TransformationDescriptor<Type,Type> post) {
+        super(DataSetType.createDefault(predicateDescriptor.getInputType()),
+                DataSetType.createDefault(predicateDescriptor.getInputType()),
+                true);
+        this.predicateDescriptor = predicateDescriptor;
+        this.pre = pre;
+        this.post = post;
+        this.isHackIt = true;
+    }
+
     /**
      * Creates a new instance.
      *
@@ -64,6 +85,13 @@ public class FilterOperator<Type> extends UnaryToUnaryOperator<Type, Type> {
      */
     public FilterOperator(DataSetType<Type> type, PredicateDescriptor.SerializablePredicate<Type> predicateDescriptor) {
         this(new PredicateDescriptor<>(predicateDescriptor, type.getDataUnitType().getTypeClass()), type);
+    }
+
+//HackitVersion
+    public FilterOperator(DataSetType<Type> type, PredicateDescriptor.SerializablePredicate<Type> predicateDescriptor
+            ,TransformationDescriptor<Type,Type> pre
+            ,TransformationDescriptor<Type,Type> post) {
+        this(new PredicateDescriptor<>(predicateDescriptor, type.getDataUnitType().getTypeClass()), type,pre,post);
     }
 
     /**
@@ -76,6 +104,17 @@ public class FilterOperator<Type> extends UnaryToUnaryOperator<Type, Type> {
         this.predicateDescriptor = predicateDescriptor;
     }
 
+    //Base HackitOperator
+    public FilterOperator(PredicateDescriptor<Type> predicateDescriptor, DataSetType<Type> type
+            ,TransformationDescriptor<Type,Type> pre
+            ,TransformationDescriptor<Type,Type> post) {
+        super(type, type, true);
+        this.predicateDescriptor = predicateDescriptor;
+        this.pre = pre;
+        this.post = post;
+        this.isHackIt = true;
+    }
+
     /**
      * Copies an instance (exclusive of broadcasts).
      *
@@ -84,6 +123,9 @@ public class FilterOperator<Type> extends UnaryToUnaryOperator<Type, Type> {
     public FilterOperator(FilterOperator<Type> that) {
         super(that);
         this.predicateDescriptor = that.getPredicateDescriptor();
+        this.isHackIt = that.isHackIt();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     public PredicateDescriptor<Type> getPredicateDescriptor() {

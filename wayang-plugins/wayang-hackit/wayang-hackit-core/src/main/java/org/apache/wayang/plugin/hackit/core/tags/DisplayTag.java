@@ -31,14 +31,14 @@ public class DisplayTag extends HackitTag  {
     /**
      * Default constructor
      */
-    private DisplayTag(){
+    public DisplayTag(){
         super();
     }
 
     @Override
     public boolean isSendOut() {
         //TODO: set the correct value to this return
-        return false;
+        return true;
     }
 
     @Override
@@ -70,5 +70,9 @@ public class DisplayTag extends HackitTag  {
     @Override
     public int hashCode() {
         return 3;
+    }
+    @Override
+    public String toString(){
+        return "DisplayTag";
     }
 }

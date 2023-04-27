@@ -31,20 +31,20 @@ public class CrashTag extends HackitTag {
     /**
      * Default constructor
      */
-    private CrashTag(){
+    public CrashTag(){
         super();
     }
 
     @Override
     public boolean isSendOut() {
         //TODO: set the correct value to this return
-        return false;
+        return true;
     }
 
     @Override
     public boolean isSkip() {
         //TODO: set the correct value to this return
-        return false;
+        return true;
     }
 
     @Override
@@ -70,5 +70,10 @@ public class CrashTag extends HackitTag {
     @Override
     public int hashCode() {
         return 1;
+    }
+
+    @Override
+    public String toString(){
+        return "CrashTag";
     }
 }

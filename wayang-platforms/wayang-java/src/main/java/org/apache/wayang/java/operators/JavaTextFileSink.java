@@ -37,6 +37,8 @@ import org.apache.wayang.java.channels.JavaChannelInstance;
 import org.apache.wayang.java.channels.StreamChannel;
 import org.apache.wayang.java.execution.JavaExecutor;
 import org.apache.wayang.java.platform.JavaPlatform;
+import org.apache.wayang.java.plugin.hackit.HackitStream;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -80,6 +82,37 @@ public class JavaTextFileSink<T> extends TextFileSink<T> implements JavaExecutio
                     dataQuantum -> {
                         try {
                             writer.write(formatter.apply(dataQuantum));
+                            writer.write('\n');
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    }
+            );
+        } catch (IOException e) {
+            throw new WayangException("Writing failed.", e);
+        }
+
+        return ExecutionOperator.modelEagerExecution(inputs, outputs, operatorContext);
+    }
+
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            JavaExecutor javaExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+
+        JavaChannelInstance input = (JavaChannelInstance) inputs[0];
+        final FileSystem fs = FileSystems.requireFileSystem(this.textFileUrl);
+        final Function<T, String> formatter = javaExecutor.getCompiler().compile(this.formattingDescriptor);
+
+
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(fs.create(this.textFileUrl)))) {
+            new HackitStream<>(input.provideStream()).map(x->((HackitTuple) x).getValue()).getStream()
+            //input.<T>provideStream().map(x->x.getValue)
+                    .forEach(
+                    dataQuantum -> {
+                        try {
+                            writer.write((String) ((HackitTuple)dataQuantum).getValue());
                             writer.write('\n');
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);

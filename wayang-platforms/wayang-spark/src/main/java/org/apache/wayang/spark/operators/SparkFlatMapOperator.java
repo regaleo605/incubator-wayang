@@ -20,9 +20,11 @@ package org.apache.wayang.spark.operators;
 
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
+import org.apache.spark.api.java.function.Function;
 import org.apache.wayang.basic.operators.FlatMapOperator;
 import org.apache.wayang.core.api.Configuration;
 import org.apache.wayang.core.function.FlatMapDescriptor;
+import org.apache.wayang.core.function.TransformationDescriptor;
 import org.apache.wayang.core.optimizer.OptimizationContext;
 import org.apache.wayang.core.optimizer.costs.LoadProfileEstimator;
 import org.apache.wayang.core.optimizer.costs.LoadProfileEstimators;
@@ -32,15 +34,14 @@ import org.apache.wayang.core.platform.ChannelInstance;
 import org.apache.wayang.core.platform.lineage.ExecutionLineageNode;
 import org.apache.wayang.core.types.DataSetType;
 import org.apache.wayang.core.util.Tuple;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 import org.apache.wayang.spark.channels.BroadcastChannel;
 import org.apache.wayang.spark.channels.RddChannel;
 import org.apache.wayang.spark.execution.SparkExecutor;
+import org.apache.wayang.spark.plugin.hackit.HackitRDD;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 
 /**
@@ -49,6 +50,10 @@ import java.util.Optional;
 public class SparkFlatMapOperator<InputType, OutputType>
         extends FlatMapOperator<InputType, OutputType>
         implements SparkExecutionOperator {
+
+    private boolean isHackIt = false;
+    private TransformationDescriptor<InputType, InputType> pre;
+    private TransformationDescriptor<OutputType,OutputType> post;
 
     /**
      * Creates a new instance.
@@ -67,6 +72,9 @@ public class SparkFlatMapOperator<InputType, OutputType>
      */
     public SparkFlatMapOperator(FlatMapOperator<InputType, OutputType> that) {
         super(that);
+        this.isHackIt = that.isHackIt();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     @Override
@@ -78,6 +86,8 @@ public class SparkFlatMapOperator<InputType, OutputType>
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
 
+        if(isHackIt) return hackit(inputs,outputs,sparkExecutor,operatorContext);
+
         final RddChannel.Instance input = (RddChannel.Instance) inputs[0];
         final RddChannel.Instance output = (RddChannel.Instance) outputs[0];
 
@@ -86,6 +96,31 @@ public class SparkFlatMapOperator<InputType, OutputType>
 
         final JavaRDD<InputType> inputRdd = input.provideRdd();
         final JavaRDD<OutputType> outputRdd = inputRdd.flatMap(flatMapFunction);
+        this.name(outputRdd);
+        output.accept(outputRdd, sparkExecutor);
+
+        return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
+    }
+
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            SparkExecutor sparkExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+
+        final RddChannel.Instance input = (RddChannel.Instance) inputs[0];
+        final RddChannel.Instance output = (RddChannel.Instance) outputs[0];
+
+        final FlatMapFunction<InputType, OutputType> flatMapFunction =
+                sparkExecutor.getCompiler().compile(this.functionDescriptor, this, operatorContext, inputs);
+
+        Function<InputType,InputType> preFunction = null;
+        Function<OutputType,OutputType> postFunction = null;
+        if(this.pre.getJavaImplementation()!=null) preFunction = sparkExecutor.getCompiler().compile(this.pre,this,operatorContext,null);
+        if(this.post.getJavaImplementation()!=null) postFunction = sparkExecutor.getCompiler().compile(this.post,this,operatorContext,null);
+
+        final JavaRDD<HackitTuple<Object,InputType>> inputRdd = input.provideHackitRDD();
+        final JavaRDD<OutputType> outputRdd = new HackitRDD<>(inputRdd).flatMap(flatMapFunction,preFunction,postFunction).getRdd();
         this.name(outputRdd);
         output.accept(outputRdd, sparkExecutor);
 

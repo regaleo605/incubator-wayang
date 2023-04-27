@@ -27,8 +27,12 @@ import org.apache.wayang.core.optimizer.cardinality.CardinalityEstimator;
 import org.apache.wayang.core.optimizer.cardinality.DefaultCardinalityEstimator;
 import org.apache.wayang.core.plan.wayangplan.BinaryToUnaryOperator;
 import org.apache.wayang.core.types.DataSetType;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 
 /**
@@ -36,6 +40,22 @@ import java.util.Optional;
  */
 public class JoinOperator<InputType0, InputType1, Key>
         extends BinaryToUnaryOperator<InputType0, InputType1, Tuple2<InputType0, InputType1>> {
+
+    protected HackitTag preTag;
+    protected HackitTag postTag;
+
+    protected boolean isHackIt = false;
+
+    public HackitTag getPreTag(){return this.preTag;}
+    public HackitTag getPostTag(){return this.postTag;}
+
+    public boolean isHackIt(){return this.isHackIt;}
+
+    protected Set<HackitTag> preTags = new HashSet<>();
+    protected Set<HackitTag> postTags = new HashSet<>();
+
+    public Set<HackitTag> getPreTags(){return this.preTags;}
+    public Set<HackitTag> getPostTags(){return this.postTags;}
 
     private static <InputType0, InputType1> DataSetType<Tuple2<InputType0, InputType1>> createOutputDataSetType() {
         return DataSetType.createDefaultUnchecked(Tuple2.class);
@@ -56,6 +76,30 @@ public class JoinOperator<InputType0, InputType1, Key>
         );
     }
 
+    public JoinOperator(FunctionDescriptor.SerializableFunction<InputType0, Key> keyExtractor0,
+                        FunctionDescriptor.SerializableFunction<InputType1, Key> keyExtractor1,
+                        Class<InputType0> input0Class,
+                        Class<InputType1> input1Class,
+                        Class<Key> keyClass,HackitTag preTag, HackitTag postTag) {
+        this(
+                new TransformationDescriptor<>(keyExtractor0, input0Class, keyClass),
+                new TransformationDescriptor<>(keyExtractor1, input1Class, keyClass),
+                preTag,postTag
+        );
+    }
+
+    public JoinOperator(FunctionDescriptor.SerializableFunction<InputType0, Key> keyExtractor0,
+                        FunctionDescriptor.SerializableFunction<InputType1, Key> keyExtractor1,
+                        Class<InputType0> input0Class,
+                        Class<InputType1> input1Class,
+                        Class<Key> keyClass,Set<HackitTag> preTag, Set<HackitTag> postTag) {
+        this(
+                new TransformationDescriptor<>(keyExtractor0, input0Class, keyClass),
+                new TransformationDescriptor<>(keyExtractor1, input1Class, keyClass),
+                preTag,postTag
+        );
+    }
+
     public JoinOperator(TransformationDescriptor<InputType0, Key> keyDescriptor0,
                         TransformationDescriptor<InputType1, Key> keyDescriptor1) {
         super(DataSetType.createDefault(keyDescriptor0.getInputType()),
@@ -65,6 +109,34 @@ public class JoinOperator<InputType0, InputType1, Key>
         this.keyDescriptor0 = keyDescriptor0;
         this.keyDescriptor1 = keyDescriptor1;
     }
+
+    public JoinOperator(TransformationDescriptor<InputType0, Key> keyDescriptor0,
+                        TransformationDescriptor<InputType1, Key> keyDescriptor1,HackitTag preTag, HackitTag postTag) {
+        super(DataSetType.createDefault(keyDescriptor0.getInputType()),
+                DataSetType.createDefault(keyDescriptor1.getInputType()),
+                JoinOperator.createOutputDataSetType(),
+                true);
+        this.keyDescriptor0 = keyDescriptor0;
+        this.keyDescriptor1 = keyDescriptor1;
+        if(preTag != null) this.preTags = Collections.singleton(preTag);
+        if(postTag != null) this.postTags = Collections.singleton(postTag);
+        this.isHackIt = true;
+    }
+
+    public JoinOperator(TransformationDescriptor<InputType0, Key> keyDescriptor0,
+                        TransformationDescriptor<InputType1, Key> keyDescriptor1,Set<HackitTag> preTag, Set<HackitTag> postTag) {
+        super(DataSetType.createDefault(keyDescriptor0.getInputType()),
+                DataSetType.createDefault(keyDescriptor1.getInputType()),
+                JoinOperator.createOutputDataSetType(),
+                true);
+        this.keyDescriptor0 = keyDescriptor0;
+        this.keyDescriptor1 = keyDescriptor1;
+        if(preTag!=null) this.preTags = preTag;
+        if(postTag!=null) this.postTags = postTag;
+        this.isHackIt = true;
+    }
+
+
     public JoinOperator(TransformationDescriptor<InputType0, Key> keyDescriptor0,
                         TransformationDescriptor<InputType1, Key> keyDescriptor1,
                         DataSetType<InputType0> inputType0,
@@ -72,6 +144,30 @@ public class JoinOperator<InputType0, InputType1, Key>
         super(inputType0, inputType1, JoinOperator.createOutputDataSetType(), true);
         this.keyDescriptor0 = keyDescriptor0;
         this.keyDescriptor1 = keyDescriptor1;
+    }
+
+    public JoinOperator(TransformationDescriptor<InputType0, Key> keyDescriptor0,
+                        TransformationDescriptor<InputType1, Key> keyDescriptor1,
+                        DataSetType<InputType0> inputType0,
+                        DataSetType<InputType1> inputType1,HackitTag preTag, HackitTag postTag) {
+        super(inputType0, inputType1, JoinOperator.createOutputDataSetType(), true);
+        this.keyDescriptor0 = keyDescriptor0;
+        this.keyDescriptor1 = keyDescriptor1;
+        if(preTag != null) this.preTags = Collections.singleton(preTag);
+        if(postTag != null) this.postTags = Collections.singleton(postTag);
+        this.isHackIt = true;
+    }
+
+    public JoinOperator(TransformationDescriptor<InputType0, Key> keyDescriptor0,
+                        TransformationDescriptor<InputType1, Key> keyDescriptor1,
+                        DataSetType<InputType0> inputType0,
+                        DataSetType<InputType1> inputType1,Set<HackitTag> preTag, Set<HackitTag> postTag) {
+        super(inputType0, inputType1, JoinOperator.createOutputDataSetType(), true);
+        this.keyDescriptor0 = keyDescriptor0;
+        this.keyDescriptor1 = keyDescriptor1;
+        if(preTag!=null) this.preTags = preTag;
+        if(postTag!=null) this.postTags = postTag;
+        this.isHackIt = true;
     }
 
 
@@ -84,6 +180,9 @@ public class JoinOperator<InputType0, InputType1, Key>
         super(that);
         this.keyDescriptor0 = that.getKeyDescriptor0();
         this.keyDescriptor1 = that.getKeyDescriptor1();
+        this.preTag = that.getPreTag();
+        this.postTag = that.getPostTag();
+        this.isHackIt = that.isHackIt();
     }
 
     public TransformationDescriptor<InputType0, Key> getKeyDescriptor0() {

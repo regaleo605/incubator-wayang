@@ -21,6 +21,7 @@ package org.apache.wayang.java.operators;
 import org.apache.wayang.basic.operators.FilterOperator;
 import org.apache.wayang.core.api.Configuration;
 import org.apache.wayang.core.function.PredicateDescriptor;
+import org.apache.wayang.core.function.TransformationDescriptor;
 import org.apache.wayang.core.optimizer.OptimizationContext;
 import org.apache.wayang.core.optimizer.costs.LoadProfileEstimator;
 import org.apache.wayang.core.optimizer.costs.LoadProfileEstimators;
@@ -34,12 +35,11 @@ import org.apache.wayang.java.channels.CollectionChannel;
 import org.apache.wayang.java.channels.JavaChannelInstance;
 import org.apache.wayang.java.channels.StreamChannel;
 import org.apache.wayang.java.execution.JavaExecutor;
+import org.apache.wayang.java.plugin.hackit.HackitStream;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -48,6 +48,10 @@ import java.util.function.Predicate;
 public class JavaFilterOperator<Type>
         extends FilterOperator<Type>
         implements JavaExecutionOperator {
+
+    private TransformationDescriptor<Type,Type> pre;
+    private TransformationDescriptor<Type,Type> post;
+    private boolean isHackIt = false;
 
 
     /**
@@ -70,6 +74,9 @@ public class JavaFilterOperator<Type>
      */
     public JavaFilterOperator(FilterOperator<Type> that) {
         super(that);
+        this.isHackIt = that.isHackIt();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     @Override
@@ -82,9 +89,30 @@ public class JavaFilterOperator<Type>
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
 
+        if(isHackIt) return hackit(inputs,outputs,javaExecutor,operatorContext);
+
         final Predicate<Type> filterFunction = javaExecutor.getCompiler().compile(this.predicateDescriptor);
         JavaExecutor.openFunction(this, filterFunction, inputs, operatorContext);
         ((StreamChannel.Instance) outputs[0]).accept(((JavaChannelInstance) inputs[0]).<Type>provideStream().filter(filterFunction));
+
+        return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
+    }
+
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            JavaExecutor javaExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+
+        final JavaChannelInstance input = (JavaChannelInstance) inputs[0];
+        final StreamChannel.Instance output = (StreamChannel.Instance) outputs[0];
+        final Predicate<Type> filterFunction = javaExecutor.getCompiler().compile(this.predicateDescriptor);
+        Function<Type,Type> preFunction = null;
+        Function<Type,Type> postFunction = null;
+        if(this.pre!=null) preFunction = javaExecutor.getCompiler().compile(this.pre);
+        if(this.post!=null) postFunction = javaExecutor.getCompiler().compile(this.post);
+        JavaExecutor.openFunction(this, filterFunction, inputs, operatorContext);
+        output.accept(new HackitStream<>(input.provideStream()).filter(filterFunction,preFunction,postFunction).getStream());
 
         return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
     }

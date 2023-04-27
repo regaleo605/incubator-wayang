@@ -34,12 +34,11 @@ import org.apache.wayang.java.channels.CollectionChannel;
 import org.apache.wayang.java.channels.JavaChannelInstance;
 import org.apache.wayang.java.channels.StreamChannel;
 import org.apache.wayang.java.execution.JavaExecutor;
+import org.apache.wayang.java.plugin.hackit.HackitStream;
+import org.apache.wayang.plugin.hackit.core.tags.HackitTag;
+import org.apache.wayang.plugin.hackit.core.tuple.HackitTuple;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -49,9 +48,14 @@ public class JavaMapOperator<InputType, OutputType>
         extends MapOperator<InputType, OutputType>
         implements JavaExecutionOperator {
 
+    private TransformationDescriptor<InputType,InputType> pre;
+    private TransformationDescriptor<OutputType,OutputType> post;
+    private boolean isHackIt = false;
+
     /**
      * Creates a new instance.
      */
+
     public JavaMapOperator(DataSetType<InputType> inputType,
                            DataSetType<OutputType> outputType,
                            TransformationDescriptor<InputType, OutputType> functionDescriptor) {
@@ -65,6 +69,9 @@ public class JavaMapOperator<InputType, OutputType>
      */
     public JavaMapOperator(MapOperator<InputType, OutputType> that) {
         super(that);
+        this.isHackIt = that.isHackit();
+        this.pre = that.getPre();
+        this.post = that.getPost();
     }
 
     @Override
@@ -75,6 +82,9 @@ public class JavaMapOperator<InputType, OutputType>
             OptimizationContext.OperatorContext operatorContext) {
         assert inputs.length == this.getNumInputs();
         assert outputs.length == this.getNumOutputs();
+
+        if(this.isHackIt) return hackit(inputs,outputs,javaExecutor,operatorContext);
+
         final JavaChannelInstance input = (JavaChannelInstance) inputs[0];
         final StreamChannel.Instance output = (StreamChannel.Instance) outputs[0];
 
@@ -82,6 +92,26 @@ public class JavaMapOperator<InputType, OutputType>
         JavaExecutor.openFunction(this, function, inputs, operatorContext);
         output.accept(input.<InputType>provideStream().map(function));
 
+        return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
+    }
+
+    public Tuple<Collection<ExecutionLineageNode>, Collection<ChannelInstance>> hackit(
+            ChannelInstance[] inputs,
+            ChannelInstance[] outputs,
+            JavaExecutor javaExecutor,
+            OptimizationContext.OperatorContext operatorContext) {
+
+        final JavaChannelInstance input = (JavaChannelInstance) inputs[0];
+        final StreamChannel.Instance output = (StreamChannel.Instance) outputs[0];
+
+        final Function<InputType, OutputType> function = javaExecutor.getCompiler().compile(this.functionDescriptor);
+        Function<InputType,InputType> preFunction = null;
+        Function<OutputType,OutputType> postFunction = null;
+        if(this.pre!=null) preFunction = javaExecutor.getCompiler().compile(this.pre);
+        if(this.post!=null) postFunction = javaExecutor.getCompiler().compile(this.post);
+
+        JavaExecutor.openFunction(this, function, inputs, operatorContext);
+        output.accept(new HackitStream<>(input.provideStream()).map(function,preFunction,postFunction).getStream());
         return ExecutionOperator.modelLazyExecution(inputs, outputs, operatorContext);
     }
 

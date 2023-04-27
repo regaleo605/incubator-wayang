@@ -42,8 +42,16 @@ public class LocalCallbackSink<T> extends UnarySink<T> {
 
     protected Collection<T> collector;
 
+    protected boolean value;
+
+    public boolean isValue(){ return value;}
+
     public static <T> LocalCallbackSink<T> createCollectingSink(Collection<T> collector, DataSetType<T> type) {
         return new LocalCallbackSink<>((ConsumerDescriptor.SerializableConsumer<T>)collector::add, type).setCollector(collector);
+    }
+
+    public static <T> LocalCallbackSink<T> createCollectingSink(Collection<T> collector, DataSetType<T> type,boolean value) {
+        return new LocalCallbackSink<>((ConsumerDescriptor.SerializableConsumer<T>)collector::add, type,value).setCollector(collector);
     }
 
     public static <T> LocalCallbackSink<T> createCollectingSink(Collection<T> collector, Class<T> typeClass) {
@@ -80,6 +88,7 @@ public class LocalCallbackSink<T> extends UnarySink<T> {
         this.callback = that.getCallback();
         this.callbackDescriptor = that.getCallbackDescriptor();
         this.collector = that.collector;
+        this.value = that.isValue();
     }
 
 
@@ -93,6 +102,11 @@ public class LocalCallbackSink<T> extends UnarySink<T> {
         this(callback, DataSetType.createDefault(typeClass));
     }
 
+    public LocalCallbackSink(Consumer<T> callback, Class<T> typeClass,boolean value) {
+        this(callback, DataSetType.createDefault(typeClass));
+    }
+
+
     /**
      * Creates a new instance.
      */
@@ -100,6 +114,13 @@ public class LocalCallbackSink<T> extends UnarySink<T> {
         super(DataSetType.createDefault(BasicDataUnitType.createBasic(typeClass)), true);
         this.callbackDescriptor = consumerDescriptor;
         this.callback = consumerDescriptor;
+    }
+
+    public LocalCallbackSink(ConsumerDescriptor.SerializableConsumer<T> consumerDescriptor, Class<T> typeClass,boolean value) {
+        super(DataSetType.createDefault(BasicDataUnitType.createBasic(typeClass)), true);
+        this.callbackDescriptor = consumerDescriptor;
+        this.callback = consumerDescriptor;
+        this.value = value;
     }
 
     /**
@@ -111,6 +132,13 @@ public class LocalCallbackSink<T> extends UnarySink<T> {
         super(type, true);
         this.callbackDescriptor = consumerDescriptor;
         this.callback = consumerDescriptor;
+    }
+
+    public LocalCallbackSink(ConsumerDescriptor.SerializableConsumer<T> consumerDescriptor, DataSetType<T> type,boolean value) {
+        super(type, true);
+        this.callbackDescriptor = consumerDescriptor;
+        this.callback = consumerDescriptor;
+        this.value = value;
     }
 
     public LocalCallbackSink<T> setCollector(Collection<T> collector){
